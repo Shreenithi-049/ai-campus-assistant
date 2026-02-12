@@ -1,41 +1,232 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
+# ============================================
+# Dependencies
+# ============================================
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
-# Expo
+# ============================================
+# Expo / React Native
+# ============================================
 .expo/
+.expo-shared/
 dist/
 web-build/
 expo-env.d.ts
-
-# Native
-.kotlin/
-*.orig.*
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
 
-# Metro
-.metro-health-check*
+# ============================================
+# Environment Variables & Secrets
+# ============================================
+# CRITICAL: Never commit environment files containing real API keys or secrets
+# Team members should create their own .env file locally using .env.example as a template
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+.env.staging
+# Note: .env.example is intentionally NOT ignored - it's a template file with no real secrets
 
-# debug
+# ============================================
+# Firebase
+# ============================================
+# Firebase service account keys (JSON files)
+*-firebase-adminsdk-*.json
+firebase-service-account.json
+serviceAccountKey.json
+google-services.json
+GoogleService-Info.plist
+
+# Firebase cache and config
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# ============================================
+# Build Artifacts
+# ============================================
+# Android
+/android/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+local.properties
+.gradle/
+build/
+*.iml
+
+# iOS
+/ios/
+*.ipa
+*.app.dSYM.zip
+*.app.dSYM
+Podfile.lock
+Pods/
+*.xcworkspace
+!default.xcworkspace
+*.xcuserdata
+*.xcuserstate
+project.xcworkspace/
+xcuserdata/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# ============================================
+# Metro Bundler
+# ============================================
+.metro-health-check*
+.metro-cache/
+
+# ============================================
+# Debug & Logs
+# ============================================
+*.log
+logs/
+*.log.*
 npm-debug.*
 yarn-debug.*
 yarn-error.*
 
+# ============================================
+# IDE & Editor
+# ============================================
+# VSCode
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# IntelliJ / WebStorm
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Xcode
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.xccheckout
+*.moved-aside
+DerivedData
+*.hmap
+*.ipa
+*.xcuserstate
+project.xcworkspace
+
+# ============================================
+# OS Files
+# ============================================
 # macOS
 .DS_Store
-*.pem
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
 
-# local env files
-.env*.local
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
 
-# typescript
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ============================================
+# TypeScript
+# ============================================
 *.tsbuildinfo
+*.d.ts.map
 
-# generated native folders
-/ios
-/android
+# ============================================
+# Testing
+# ============================================
+coverage/
+.nyc_output/
+*.lcov
+.jest/
+
+# ============================================
+# Temporary Files
+# ============================================
+*.swp
+*.swo
+*~
+.tmp/
+temp/
+tmp/
+*.tmp
+*.bak
+*.cache
+
+# ============================================
+# Certificates & Keys
+# ============================================
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# ============================================
+# Misc
+# ============================================
+*.orig.*
+.kotlin/
+.npm/
+.eslintcache
+.stylelintcache
