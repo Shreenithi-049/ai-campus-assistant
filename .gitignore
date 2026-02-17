@@ -230,3 +230,8 @@ tmp/
 .npm/
 .eslintcache
 .stylelintcache
+
+
+
+.env
+
