@@ -3,12 +3,14 @@ import { View, TouchableOpacity, Text, StyleSheet, Platform } from 'react-native
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { lightTheme, darkTheme, spacing, typography, borderRadius, shadows } from '../constants/modernTheme';
+import { useAuth } from '../contexts/AuthContext';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-export const BottomNavigation = ({ state, descriptors, navigation, isDark = false }) => {
+export const BottomNavigation = ({ state, descriptors, navigation }) => {
   const [hoveredIndex, setHoveredIndex] = useState(null);
-  const theme = isDark ? darkTheme : lightTheme;
+  const { isDarkMode } = useAuth();
+  const theme = isDarkMode ? darkTheme : lightTheme;
 
   const tabs = [
     { name: 'Home', icon: 'home-outline', activeIcon: 'home', label: 'Home' },

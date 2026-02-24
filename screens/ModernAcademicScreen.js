@@ -1,38 +1,52 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn, SlideInRight } from 'react-native-reanimated';
 import { lightTheme, darkTheme, spacing, typography, borderRadius, shadows } from '../constants/modernTheme';
 import { useAuth } from '../contexts/AuthContext';
+import { subscribeToTimetable } from '../services/timetableService';
+import { subscribeToFaculty } from '../services/facultyService';
+import { subscribeToSyllabus } from '../services/syllabusService';
 
 export default function ModernAcademicScreen({ navigation }) {
-  const { isDarkMode, toggleDarkMode } = useAuth();
+  const { isDarkMode, toggleDarkMode, user, userProfile } = useAuth();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const [activeTab, setActiveTab] = useState('timetable');
+  const [timetable, setTimetable] = useState([]);
+  const [faculty, setFaculty] = useState([]);
+  const [syllabus, setSyllabus] = useState([]);
+
+  useEffect(() => {
+    const unsubTimetable = subscribeToTimetable(
+      userProfile?.department || 'Computer Science',
+      userProfile?.year || '3rd Year',
+      setTimetable,
+      (error) => console.error('Timetable error:', error)
+    );
+
+    const unsubFaculty = subscribeToFaculty(
+      setFaculty,
+      (error) => console.error('Faculty error:', error)
+    );
+
+    const unsubSyllabus = subscribeToSyllabus(
+      user?.uid,
+      setSyllabus,
+      (error) => console.error('Syllabus error:', error)
+    );
+
+    return () => {
+      unsubTimetable();
+      unsubFaculty();
+      unsubSyllabus();
+    };
+  }, [user, userProfile]);
 
   const tabs = [
     { id: 'timetable', label: 'Timetable', icon: 'calendar-outline' },
     { id: 'faculty', label: 'Faculty', icon: 'people-outline' },
     { id: 'syllabus', label: 'Syllabus', icon: 'book-outline' },
-  ];
-
-  const timetable = [
-    { id: 1, subject: 'Data Structures', time: '9:00 AM - 10:30 AM', room: 'ENG-301', professor: 'Dr. Smith', color: '#3B82F6' },
-    { id: 2, subject: 'Database Systems', time: '11:00 AM - 12:30 PM', room: 'ENG-205', professor: 'Dr. Johnson', color: '#10B981' },
-    { id: 3, subject: 'Web Development', time: '2:00 PM - 3:30 PM', room: 'ENG-401', professor: 'Dr. Williams', color: '#8B5CF6' },
-  ];
-
-  const faculty = [
-    { id: 1, name: 'Dr. Sarah Smith', department: 'Computer Science', email: 'sarah.smith@university.edu', office: 'ENG-501', hours: 'Mon-Wed 2-4 PM' },
-    { id: 2, name: 'Dr. John Johnson', department: 'Computer Science', email: 'john.johnson@university.edu', office: 'ENG-502', hours: 'Tue-Thu 3-5 PM' },
-    { id: 3, name: 'Dr. Emily Williams', department: 'Computer Science', email: 'emily.williams@university.edu', office: 'ENG-503', hours: 'Mon-Fri 1-3 PM' },
-  ];
-
-  const syllabus = [
-    { id: 1, subject: 'Data Structures', progress: 75, topics: 12, completed: 9 },
-    { id: 2, subject: 'Database Systems', progress: 60, topics: 10, completed: 6 },
-    { id: 3, subject: 'Web Development', progress: 45, topics: 15, completed: 7 },
   ];
 
   const renderTimetable = () => (

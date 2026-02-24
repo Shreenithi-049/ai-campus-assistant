@@ -1,16 +1,111 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { lightTheme, darkTheme, spacing, typography, borderRadius, shadows } from '../constants/modernTheme';
 import { useAuth } from '../contexts/AuthContext';
+import { subscribeToEvents } from '../services/eventsService';
+import { EventCardSkeleton } from '../components/SkeletonLoaders';
+
+const EventCard = React.memo(({ event, theme, index }) => (
+  <Animated.View entering={FadeInDown.delay(index * 100)}>
+    <View style={[styles.eventCard, { backgroundColor: theme.surface }, shadows.md]}>
+      <View style={[styles.eventColorBar, { backgroundColor: event.color }]} />
+      
+      <View style={styles.eventContent}>
+        <View style={styles.eventHeader}>
+          <View style={[styles.eventIcon, { backgroundColor: event.color + '20' }]}>
+            <Ionicons name={event.icon} size={24} color={event.color} />
+          </View>
+          {event.registered && (
+            <View style={[styles.registeredBadge, { backgroundColor: '#10B981' }]}>
+              <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
+              <Text style={styles.registeredText}>Registered</Text>
+            </View>
+          )}
+        </View>
+
+        <Text style={[styles.eventTitle, { color: theme.text }]}>
+          {event.title}
+        </Text>
+
+        <View style={styles.eventDetails}>
+          <View style={styles.eventDetailRow}>
+            <Ionicons name="calendar-outline" size={16} color={theme.textSecondary} />
+            <Text style={[styles.eventDetailText, { color: theme.textSecondary }]}>
+              {event.date}
+            </Text>
+          </View>
+          <View style={styles.eventDetailRow}>
+            <Ionicons name="time-outline" size={16} color={theme.textSecondary} />
+            <Text style={[styles.eventDetailText, { color: theme.textSecondary }]}>
+              {event.time}
+            </Text>
+          </View>
+          <View style={styles.eventDetailRow}>
+            <Ionicons name="location-outline" size={16} color={theme.textSecondary} />
+            <Text style={[styles.eventDetailText, { color: theme.textSecondary }]}>
+              {event.location}
+            </Text>
+          </View>
+          <View style={styles.eventDetailRow}>
+            <Ionicons name="people-outline" size={16} color={theme.textSecondary} />
+            <Text style={[styles.eventDetailText, { color: theme.textSecondary }]}>
+              {event.attendees} attendees
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.eventActions}>
+          {!event.registered ? (
+            <TouchableOpacity 
+              style={[styles.registerButton, { backgroundColor: theme.primary }, shadows.sm]}
+            >
+              <Text style={styles.registerButtonText}>Register Now</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity 
+              style={[styles.detailsButton, { borderColor: theme.primary }]}
+            >
+              <Text style={[styles.detailsButtonText, { color: theme.primary }]}>
+                View Details
+              </Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity 
+            style={[styles.shareButton, { backgroundColor: theme.glassBackground }]}
+          >
+            <Ionicons name="share-social-outline" size={20} color={theme.text} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  </Animated.View>
+));
 
 export default function ModernEventsScreen({ navigation }) {
   const { isDarkMode, toggleDarkMode } = useAuth();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToEvents(
+      (eventsData) => {
+        setEvents(eventsData);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Events listener error:', error);
+        setLoading(false);
+      }
+    );
+
+    return unsubscribe;
+  }, []);
 
   const filters = [
     { id: 'all', label: 'All Events' },
@@ -19,60 +114,12 @@ export default function ModernEventsScreen({ navigation }) {
     { id: 'sports', label: 'Sports' },
   ];
 
-  const events = [
-    {
-      id: 1,
-      title: 'Tech Symposium 2024',
-      date: 'March 15, 2024',
-      time: '10:00 AM',
-      location: 'Main Auditorium',
-      category: 'academic',
-      attendees: 250,
-      color: '#3B82F6',
-      icon: 'laptop',
-      registered: false,
-    },
-    {
-      id: 2,
-      title: 'Annual Cultural Fest',
-      date: 'March 20, 2024',
-      time: '6:00 PM',
-      location: 'Open Ground',
-      category: 'cultural',
-      attendees: 500,
-      color: '#8B5CF6',
-      icon: 'musical-notes',
-      registered: true,
-    },
-    {
-      id: 3,
-      title: 'Inter-College Sports Meet',
-      date: 'March 25, 2024',
-      time: '8:00 AM',
-      location: 'Sports Complex',
-      category: 'sports',
-      attendees: 300,
-      color: '#10B981',
-      icon: 'trophy',
-      registered: false,
-    },
-    {
-      id: 4,
-      title: 'AI Workshop Series',
-      date: 'March 18, 2024',
-      time: '2:00 PM',
-      location: 'ENG-401',
-      category: 'academic',
-      attendees: 100,
-      color: '#F59E0B',
-      icon: 'bulb',
-      registered: true,
-    },
-  ];
-
-  const filteredEvents = selectedFilter === 'all' 
-    ? events 
-    : events.filter(e => e.category === selectedFilter);
+  const filteredEvents = useMemo(() => 
+    selectedFilter === 'all' 
+      ? events 
+      : events.filter(e => e.category === selectedFilter),
+    [events, selectedFilter]
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -140,86 +187,16 @@ export default function ModernEventsScreen({ navigation }) {
           style={styles.content}
           showsVerticalScrollIndicator={false}
         >
-          {filteredEvents.map((event, index) => (
-            <Animated.View
-              key={event.id}
-              entering={FadeInDown.delay(index * 100)}
-            >
-              <View style={[styles.eventCard, { backgroundColor: theme.surface }, shadows.md]}>
-                <View style={[styles.eventColorBar, { backgroundColor: event.color }]} />
-                
-                <View style={styles.eventContent}>
-                  <View style={styles.eventHeader}>
-                    <View style={[styles.eventIcon, { backgroundColor: event.color + '20' }]}>
-                      <Ionicons name={event.icon} size={24} color={event.color} />
-                    </View>
-                    {event.registered && (
-                      <View style={[styles.registeredBadge, { backgroundColor: '#10B981' }]}>
-                        <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
-                        <Text style={styles.registeredText}>Registered</Text>
-                      </View>
-                    )}
-                  </View>
+          {loading ? (
+            // Show skeleton loaders
+            [1, 2, 3].map((i) => <EventCardSkeleton key={i} theme={theme} />)
+          ) : (
+            filteredEvents.map((event, index) => (
+              <EventCard key={event.id} event={event} theme={theme} index={index} />
+            ))
+          )}
 
-                  <Text style={[styles.eventTitle, { color: theme.text }]}>
-                    {event.title}
-                  </Text>
-
-                  <View style={styles.eventDetails}>
-                    <View style={styles.eventDetailRow}>
-                      <Ionicons name="calendar-outline" size={16} color={theme.textSecondary} />
-                      <Text style={[styles.eventDetailText, { color: theme.textSecondary }]}>
-                        {event.date}
-                      </Text>
-                    </View>
-                    <View style={styles.eventDetailRow}>
-                      <Ionicons name="time-outline" size={16} color={theme.textSecondary} />
-                      <Text style={[styles.eventDetailText, { color: theme.textSecondary }]}>
-                        {event.time}
-                      </Text>
-                    </View>
-                    <View style={styles.eventDetailRow}>
-                      <Ionicons name="location-outline" size={16} color={theme.textSecondary} />
-                      <Text style={[styles.eventDetailText, { color: theme.textSecondary }]}>
-                        {event.location}
-                      </Text>
-                    </View>
-                    <View style={styles.eventDetailRow}>
-                      <Ionicons name="people-outline" size={16} color={theme.textSecondary} />
-                      <Text style={[styles.eventDetailText, { color: theme.textSecondary }]}>
-                        {event.attendees} attendees
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.eventActions}>
-                    {!event.registered ? (
-                      <TouchableOpacity 
-                        style={[styles.registerButton, { backgroundColor: theme.primary }, shadows.sm]}
-                      >
-                        <Text style={styles.registerButtonText}>Register Now</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <TouchableOpacity 
-                        style={[styles.detailsButton, { borderColor: theme.primary }]}
-                      >
-                        <Text style={[styles.detailsButtonText, { color: theme.primary }]}>
-                          View Details
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                    <TouchableOpacity 
-                      style={[styles.shareButton, { backgroundColor: theme.glassBackground }]}
-                    >
-                      <Ionicons name="share-social-outline" size={20} color={theme.text} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </Animated.View>
-          ))}
-
-          {filteredEvents.length === 0 && (
+          {!loading && filteredEvents.length === 0 && (
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={64} color={theme.textTertiary} />
               <Text style={[styles.emptyText, { color: theme.textSecondary }]}>

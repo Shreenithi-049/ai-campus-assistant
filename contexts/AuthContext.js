@@ -1,7 +1,8 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { subscribeToAuthChanges, getUserData, loginUser, logoutUser } from '../services/authService';
+import { subscribeToAuthChanges, loginUser, logoutUser } from '../services/authService';
+import { subscribeToUserProfile } from '../services/firestoreService';
 
 const AuthContext = createContext({});
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
@@ -72,30 +73,40 @@ export const AuthProvider = ({ children }) => {
   }, [user]);
 
   useEffect(() => {
+    let profileUnsubscribe = () => {};
+    
     const unsubscribe = subscribeToAuthChanges(async (authUser) => {
       setLoading(true);
       if (authUser) {
         setUser(authUser);
-        try {
-          const result = await getUserData(authUser.uid);
-          if (result.success) {
-            setUserProfile(result.data);
-          } else {
-            console.error('User profile not found in Firestore');
+        // Setup real-time profile listener
+        profileUnsubscribe = subscribeToUserProfile(
+          authUser.uid,
+          (result) => {
+            if (result.success) {
+              setUserProfile(result.data);
+            } else {
+              setUserProfile(null);
+            }
+            setLoading(false);
+          },
+          (error) => {
+            console.error('Profile listener error:', error);
             setUserProfile(null);
+            setLoading(false);
           }
-        } catch (error) {
-          console.error('Error fetching user profile:', error);
-          setUserProfile(null);
-        }
+        );
       } else {
         setUser(null);
         setUserProfile(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      profileUnsubscribe();
+    };
   }, []);
 
   const login = async (email, password) => {
@@ -113,17 +124,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const refreshUserProfile = async () => {
-    if (user) {
-      try {
-        const result = await getUserData(user.uid);
-        if (result.success) {
-          setUserProfile(result.data);
-        }
-      } catch (error) {
-        console.error('Error refreshing profile:', error);
-      }
-    }
+  const refreshUserProfile = () => {
+    // Profile updates automatically via real-time listener
+    // This function kept for compatibility
   };
 
   const value = {

@@ -1,76 +1,82 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { EmailAuthProvider, reauthenticateWithCredential, updatePassword, sendEmailVerification } from 'firebase/auth';
-import { auth } from '../services/firebaseConfig';
+import { sendVerificationEmail, sendPasswordReset, reloadUser } from '../services/authService';
+import { useAuth } from '../contexts/AuthContext';
 import { lightTheme, darkTheme, spacing, typography, borderRadius, shadows } from '../constants/modernTheme';
 
 export default function SecurityScreen({ navigation }) {
-  const [isDark, setIsDark] = useState(false);
-  const theme = isDark ? darkTheme : lightTheme;
+  const { user, isDarkMode, toggleDarkMode } = useAuth();
+  const theme = isDarkMode ? darkTheme : lightTheme;
   const [loading, setLoading] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNew, setShowNew] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(user?.emailVerified || false);
+  const [checking, setChecking] = useState(false);
 
-  const handleChangePassword = async () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all password fields');
-      return;
+  useEffect(() => {
+    setEmailVerified(user?.emailVerified || false);
+  }, [user]);
+
+  useEffect(() => {
+    if (!emailVerified) {
+      const interval = setInterval(async () => {
+        try {
+          const result = await reloadUser();
+          if (result.emailVerified) {
+            setEmailVerified(true);
+            clearInterval(interval);
+          }
+        } catch (error) {
+          console.error('Error checking verification:', error);
+        }
+      }, 3000);
+
+      return () => clearInterval(interval);
     }
+  }, [emailVerified]);
 
-    if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'New passwords do not match');
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      Alert.alert('Error', 'New password must be at least 8 characters');
-      return;
-    }
-
+  const handleSendVerificationEmail = async () => {
     setLoading(true);
     try {
-      const user = auth.currentUser;
-      const credential = EmailAuthProvider.credential(user.email, currentPassword);
-      
-      await reauthenticateWithCredential(user, credential);
-      await updatePassword(user, newPassword);
-      
-      Alert.alert('Success', 'Password changed successfully');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
+      await sendVerificationEmail();
+      if (window.confirm) {
+        window.alert('Verification email sent. Please check your inbox.');
+      }
+      setChecking(true);
     } catch (error) {
-      console.error('Password change error:', error);
-      if (error.code === 'auth/wrong-password') {
-        Alert.alert('Error', 'Current password is incorrect');
-      } else {
-        Alert.alert('Error', 'Failed to change password');
+      console.error('Verification email error:', error);
+      if (window.alert) {
+        window.alert(error.message || 'Failed to send verification email');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSendVerificationEmail = async () => {
+  const handlePasswordReset = async () => {
+    if (!window.confirm('Send password reset email to ' + user?.email + '?')) {
+      return;
+    }
+    setLoading(true);
     try {
-      await sendEmailVerification(auth.currentUser);
-      Alert.alert('Success', 'Verification email sent. Please check your inbox.');
+      await sendPasswordReset(user?.email);
+      if (window.alert) {
+        window.alert('Password reset link sent to your email.');
+      }
     } catch (error) {
-      console.error('Verification email error:', error);
-      Alert.alert('Error', 'Failed to send verification email');
+      console.error('Password reset error:', error);
+      if (window.alert) {
+        window.alert('Failed to send password reset email');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <LinearGradient
-        colors={isDark ? ['#0F172A', '#1E293B'] : ['#FFFFFF', '#F8FAFC']}
+        colors={isDarkMode ? ['#0F172A', '#1E293B'] : ['#FFFFFF', '#F8FAFC']}
         style={styles.gradient}
       >
         {/* Header */}
@@ -79,8 +85,8 @@ export default function SecurityScreen({ navigation }) {
             <Ionicons name="arrow-back" size={24} color={theme.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.text }]}>Security</Text>
-          <TouchableOpacity onPress={() => setIsDark(!isDark)}>
-            <Ionicons name={isDark ? 'sunny' : 'moon'} size={24} color={theme.text} />
+          <TouchableOpacity onPress={toggleDarkMode}>
+            <Ionicons name={isDarkMode ? 'sunny' : 'moon'} size={24} color={theme.text} />
           </TouchableOpacity>
         </View>
 
@@ -93,24 +99,34 @@ export default function SecurityScreen({ navigation }) {
             </View>
             <View style={styles.verificationStatus}>
               <Text style={[styles.statusLabel, { color: theme.textSecondary }]}>Status:</Text>
-              <View style={[styles.statusBadge, { backgroundColor: auth.currentUser?.emailVerified ? theme.success + '20' : theme.warning + '20' }]}>
+              <View style={[styles.statusBadge, { backgroundColor: emailVerified ? '#10B98120' : '#F59E0B20' }]}>
                 <Ionicons 
-                  name={auth.currentUser?.emailVerified ? 'checkmark-circle' : 'alert-circle'} 
+                  name={emailVerified ? 'checkmark-circle' : 'alert-circle'} 
                   size={16} 
-                  color={auth.currentUser?.emailVerified ? theme.success : theme.warning} 
+                  color={emailVerified ? '#10B981' : '#F59E0B'} 
                 />
-                <Text style={[styles.statusText, { color: auth.currentUser?.emailVerified ? theme.success : theme.warning }]}>
-                  {auth.currentUser?.emailVerified ? 'Verified' : 'Not Verified'}
+                <Text style={[styles.statusText, { color: emailVerified ? '#10B981' : '#F59E0B' }]}>
+                  {emailVerified ? 'Verified ✅' : 'Not Verified ❌'}
                 </Text>
               </View>
             </View>
-            {!auth.currentUser?.emailVerified && (
+            {!emailVerified && (
               <TouchableOpacity
-                style={[styles.verifyButton, { backgroundColor: theme.primary }]}
+                style={[styles.verifyButton, { backgroundColor: theme.primary, opacity: loading ? 0.7 : 1 }]}
                 onPress={handleSendVerificationEmail}
+                disabled={loading}
               >
-                <Text style={styles.verifyButtonText}>Send Verification Email</Text>
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.verifyButtonText}>Send Verification Email</Text>
+                )}
               </TouchableOpacity>
+            )}
+            {checking && !emailVerified && (
+              <Text style={[styles.checkingText, { color: theme.textSecondary }]}>
+                Checking verification status...
+              </Text>
             )}
           </View>
 
@@ -120,70 +136,21 @@ export default function SecurityScreen({ navigation }) {
               <Ionicons name="lock-closed" size={24} color={theme.primary} />
               <Text style={[styles.sectionTitle, { color: theme.text }]}>Change Password</Text>
             </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: theme.text }]}>Current Password</Text>
-              <View style={[styles.input, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-                <TextInput
-                  style={[styles.textInput, { color: theme.text }]}
-                  value={currentPassword}
-                  onChangeText={setCurrentPassword}
-                  placeholder="Enter current password"
-                  placeholderTextColor={theme.textTertiary}
-                  secureTextEntry={!showCurrent}
-                  editable={!loading}
-                />
-                <TouchableOpacity onPress={() => setShowCurrent(!showCurrent)}>
-                  <Ionicons name={showCurrent ? 'eye-off' : 'eye'} size={20} color={theme.textSecondary} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: theme.text }]}>New Password</Text>
-              <View style={[styles.input, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-                <TextInput
-                  style={[styles.textInput, { color: theme.text }]}
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  placeholder="Enter new password"
-                  placeholderTextColor={theme.textTertiary}
-                  secureTextEntry={!showNew}
-                  editable={!loading}
-                />
-                <TouchableOpacity onPress={() => setShowNew(!showNew)}>
-                  <Ionicons name={showNew ? 'eye-off' : 'eye'} size={20} color={theme.textSecondary} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={[styles.label, { color: theme.text }]}>Confirm New Password</Text>
-              <View style={[styles.input, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-                <TextInput
-                  style={[styles.textInput, { color: theme.text }]}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  placeholder="Confirm new password"
-                  placeholderTextColor={theme.textTertiary}
-                  secureTextEntry={!showConfirm}
-                  editable={!loading}
-                />
-                <TouchableOpacity onPress={() => setShowConfirm(!showConfirm)}>
-                  <Ionicons name={showConfirm ? 'eye-off' : 'eye'} size={20} color={theme.textSecondary} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
+            <Text style={[styles.infoText, { color: theme.textSecondary }]}>
+              For security reasons, password changes are done via email.
+            </Text>
             <TouchableOpacity
-              style={[styles.changePasswordButton, { backgroundColor: theme.primary, opacity: loading ? 0.7 : 1 }]}
-              onPress={handleChangePassword}
+              style={[styles.resetButton, { backgroundColor: theme.primary, opacity: loading ? 0.7 : 1 }]}
+              onPress={handlePasswordReset}
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={styles.changePasswordButtonText}>Change Password</Text>
+                <>
+                  <Ionicons name="mail-outline" size={20} color="#FFFFFF" />
+                  <Text style={styles.resetButtonText}>Send Password Reset Email</Text>
+                </>
               )}
             </TouchableOpacity>
           </View>
@@ -260,33 +227,26 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
   },
-  inputContainer: {
+  checkingText: {
+    ...typography.small,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  infoText: {
+    ...typography.body,
     marginBottom: spacing.md,
+    lineHeight: 20,
   },
-  label: {
-    ...typography.smallMedium,
-    marginBottom: spacing.sm,
-  },
-  input: {
+  resetButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     padding: spacing.md,
     borderRadius: borderRadius.lg,
-    borderWidth: 1,
     gap: spacing.sm,
   },
-  textInput: {
-    ...typography.body,
-    flex: 1,
-    paddingVertical: 0,
-  },
-  changePasswordButton: {
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    alignItems: 'center',
-    marginTop: spacing.sm,
-  },
-  changePasswordButtonText: {
+  resetButtonText: {
     ...typography.bodyMedium,
     color: '#FFFFFF',
     fontWeight: '600',

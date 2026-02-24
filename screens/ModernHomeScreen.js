@@ -5,9 +5,10 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { lightTheme, darkTheme, spacing, typography, borderRadius, shadows } from '../constants/modernTheme';
 import { useAuth } from '../contexts/AuthContext';
+import { VerificationBanner } from '../components/VerificationBanner';
 
 export default function ModernHomeScreen({ navigation }) {
-  const { userProfile, isDarkMode, toggleDarkMode } = useAuth();
+  const { userProfile, isDarkMode, toggleDarkMode, user } = useAuth();
   const theme = isDarkMode ? darkTheme : lightTheme;
 
   const getGreeting = () => {
@@ -34,7 +35,7 @@ export default function ModernHomeScreen({ navigation }) {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <LinearGradient
-        colors={isDarkMode ? ['#0F172A', '##1E293B'] : ['#FFFFFF', '#F8FAFC']}
+        colors={isDarkMode ? ['#0F172A', '#1E293B'] : ['#FFFFFF', '#F8FAFC']}
         style={styles.gradient}
       >
         {/* Header */}
@@ -65,9 +66,23 @@ export default function ModernHomeScreen({ navigation }) {
         </View>
 
         <ScrollView 
-          style={styles.content}
+          style={[styles.content, { backgroundColor: theme.background }]}
+          contentContainerStyle={{ backgroundColor: 'transparent' }}
           showsVerticalScrollIndicator={false}
         >
+          {/* Verification Banner */}
+          <VerificationBanner 
+            user={user}
+            userProfile={userProfile}
+            theme={theme}
+            onPress={() => {
+              if (!user?.emailVerified) {
+                navigation.navigate('Profile', { screen: 'Security' });
+              } else {
+                navigation.navigate('Profile', { screen: 'EditProfile' });
+              }
+            }}
+          />
           {/* AI Suggestion Card */}
           <Animated.View entering={FadeInDown.delay(100)}>
             <LinearGradient

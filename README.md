@@ -49,9 +49,15 @@ IntelliCamp is a production-ready mobile and web application designed exclusivel
 
 3. **Setup environment variables**
    ```bash
+   # Copy template files
    cp .env.example .env
+   cp backend/.env.example backend/.env
+   
    # Edit .env with your Firebase credentials
+   # Edit backend/.env with your Groq API key
    ```
+   
+   **IMPORTANT**: Never commit `.env` files to Git!
 
 4. **Start the app**
    ```bash
