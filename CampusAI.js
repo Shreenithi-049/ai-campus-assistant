@@ -19,6 +19,7 @@ import ModernAcademicScreen from './screens/ModernAcademicScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
 import SecurityScreen from './screens/SecurityScreen';
 import HelpScreen from './screens/HelpScreen';
+import EventRegistrationScreen from './screens/EventRegistrationScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -74,6 +75,7 @@ function AuthNavigator() {
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
           <Stack.Screen name="Security" component={SecurityScreen} />
           <Stack.Screen name="Help" component={HelpScreen} />
+          <Stack.Screen name="EventRegistration" component={EventRegistrationScreen} />
         </>
       )}
     </Stack.Navigator>

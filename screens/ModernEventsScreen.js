@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { lightTheme, darkTheme, spacing, typography, borderRadius, shadows } from '../constants/modernTheme';
 import { useAuth } from '../contexts/AuthContext';
 import { subscribeToEvents } from '../services/eventsService';
+import { getUserRegistrations } from '../services/eventRegistrationService';
 import { EventCardSkeleton } from '../components/SkeletonLoaders';
 
-const EventCard = React.memo(({ event, theme, index }) => (
+const EventCard = React.memo(({ event, theme, index, isRegistered, onRegister }) => (
   <Animated.View entering={FadeInDown.delay(index * 100)}>
     <View style={[styles.eventCard, { backgroundColor: theme.surface }, shadows.md]}>
       <View style={[styles.eventColorBar, { backgroundColor: event.color }]} />
@@ -18,7 +19,7 @@ const EventCard = React.memo(({ event, theme, index }) => (
           <View style={[styles.eventIcon, { backgroundColor: event.color + '20' }]}>
             <Ionicons name={event.icon} size={24} color={event.color} />
           </View>
-          {event.registered && (
+          {isRegistered && (
             <View style={[styles.registeredBadge, { backgroundColor: '#10B981' }]}>
               <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
               <Text style={styles.registeredText}>Registered</Text>
@@ -58,19 +59,20 @@ const EventCard = React.memo(({ event, theme, index }) => (
         </View>
 
         <View style={styles.eventActions}>
-          {!event.registered ? (
+          {!isRegistered ? (
             <TouchableOpacity 
               style={[styles.registerButton, { backgroundColor: theme.primary }, shadows.sm]}
+              onPress={() => onRegister(event)}
             >
-              <Text style={styles.registerButtonText}>Register Now</Text>
+              <Text style={styles.registerButtonText}>Register</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity 
-              style={[styles.detailsButton, { borderColor: theme.primary }]}
+              style={[styles.registeredButtonDisabled, { backgroundColor: '#10B981' }]}
+              disabled
             >
-              <Text style={[styles.detailsButtonText, { color: theme.primary }]}>
-                View Details
-              </Text>
+              <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+              <Text style={styles.registerButtonText}>Registered ✔</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity 
@@ -85,12 +87,13 @@ const EventCard = React.memo(({ event, theme, index }) => (
 ));
 
 export default function ModernEventsScreen({ navigation }) {
-  const { isDarkMode, toggleDarkMode } = useAuth();
+  const { isDarkMode, toggleDarkMode, user } = useAuth();
   const theme = isDarkMode ? darkTheme : lightTheme;
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [registeredEvents, setRegisteredEvents] = useState([]);
 
   useEffect(() => {
     const unsubscribe = subscribeToEvents(
@@ -107,19 +110,48 @@ export default function ModernEventsScreen({ navigation }) {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (user?.uid) {
+        loadUserRegistrations();
+      }
+    });
+    return unsubscribe;
+  }, [navigation, user]);
+
+  const loadUserRegistrations = async () => {
+    try {
+      const registrations = await getUserRegistrations(user.uid);
+      const eventIds = registrations.map(reg => reg.eventId);
+      setRegisteredEvents(eventIds);
+    } catch (error) {
+      console.error('Load registrations error:', error);
+    }
+  };
+
+  const handleRegister = (event) => {
+    if (!user?.uid) {
+      Alert.alert('Error', 'Please login to register for events');
+      return;
+    }
+    navigation.navigate('EventRegistration', { event });
+  };
+
   const filters = [
     { id: 'all', label: 'All Events' },
     { id: 'academic', label: 'Academic' },
     { id: 'cultural', label: 'Cultural' },
     { id: 'sports', label: 'Sports' },
+    { id: 'myEvents', label: 'My Events' },
   ];
 
-  const filteredEvents = useMemo(() => 
-    selectedFilter === 'all' 
-      ? events 
-      : events.filter(e => e.category === selectedFilter),
-    [events, selectedFilter]
-  );
+  const filteredEvents = useMemo(() => {
+    if (selectedFilter === 'all') return events;
+    if (selectedFilter === 'myEvents') {
+      return events.filter(e => registeredEvents.includes(e.id));
+    }
+    return events.filter(e => e.category === selectedFilter);
+  }, [events, selectedFilter, registeredEvents]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -192,7 +224,14 @@ export default function ModernEventsScreen({ navigation }) {
             [1, 2, 3].map((i) => <EventCardSkeleton key={i} theme={theme} />)
           ) : (
             filteredEvents.map((event, index) => (
-              <EventCard key={event.id} event={event} theme={theme} index={index} />
+              <EventCard 
+                key={event.id} 
+                event={event} 
+                theme={theme} 
+                index={index}
+                isRegistered={registeredEvents.includes(event.id)}
+                onRegister={handleRegister}
+              />
             ))
           )}
 
@@ -332,16 +371,14 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
   },
-  detailsButton: {
+  registeredButtonDisabled: {
     flex: 1,
+    flexDirection: 'row',
     paddingVertical: spacing.md,
     borderRadius: borderRadius.lg,
     alignItems: 'center',
-    borderWidth: 2,
-  },
-  detailsButtonText: {
-    ...typography.bodyMedium,
-    fontWeight: '600',
+    justifyContent: 'center',
+    gap: spacing.xs,
   },
   shareButton: {
     width: 48,

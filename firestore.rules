@@ -38,6 +38,21 @@ service cloud.firestore {
       allow write: if false;
     }
     
+    // Event Registrations - NEW
+    match /eventRegistrations/{docId} {
+      // Allow authenticated users to read their own registrations
+      allow read: if request.auth != null && 
+                    resource.data.userId == request.auth.uid;
+      
+      // Allow authenticated users to create registrations with their own userId
+      allow create: if request.auth != null && 
+                      request.auth.uid == request.resource.data.userId &&
+                      request.resource.data.status == 'registered';
+      
+      // Prevent updates and deletes (admin only via console)
+      allow update, delete: if false;
+    }
+    
     // Default deny all other collections
     match /{document=**} {
       allow read, write: if false;
