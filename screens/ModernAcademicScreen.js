@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { subscribeToTimetable } from '../services/timetableService';
 import { subscribeToFaculty } from '../services/facultyService';
 import { subscribeToSyllabus } from '../services/syllabusService';
+import { getStudentAttendance, calculateOverallAttendance } from '../services/attendanceService';
 
 export default function ModernAcademicScreen({ navigation }) {
   const { isDarkMode, toggleDarkMode, user, userProfile } = useAuth();
@@ -16,6 +17,9 @@ export default function ModernAcademicScreen({ navigation }) {
   const [timetable, setTimetable] = useState([]);
   const [faculty, setFaculty] = useState([]);
   const [syllabus, setSyllabus] = useState([]);
+  const [attendance, setAttendance] = useState([]);
+  const [overallAttendance, setOverallAttendance] = useState(0);
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
 
   useEffect(() => {
     const unsubTimetable = subscribeToTimetable(
@@ -43,10 +47,37 @@ export default function ModernAcademicScreen({ navigation }) {
     };
   }, [user, userProfile]);
 
+  useEffect(() => {
+    if (activeTab === 'attendance' && user?.uid) {
+      loadAttendance();
+    }
+  }, [activeTab, user]);
+
+  const loadAttendance = async () => {
+    setLoadingAttendance(true);
+    const result = await getStudentAttendance(user.uid);
+    if (result.success) {
+      setAttendance(result.data);
+      const attendanceObj = result.data.reduce((acc, item) => {
+        acc[item.subject] = item.percentage;
+        return acc;
+      }, {});
+      setOverallAttendance(calculateOverallAttendance(attendanceObj));
+    }
+    setLoadingAttendance(false);
+  };
+
+  const getAttendanceColor = (percentage) => {
+    if (percentage >= 75) return '#10B981';
+    if (percentage >= 65) return '#F59E0B';
+    return '#EF4444';
+  };
+
   const tabs = [
     { id: 'timetable', label: 'Timetable', icon: 'calendar-outline' },
     { id: 'faculty', label: 'Faculty', icon: 'people-outline' },
     { id: 'syllabus', label: 'Syllabus', icon: 'book-outline' },
+    { id: 'attendance', label: 'Attendance', icon: 'checkmark-circle-outline' },
   ];
 
   const renderTimetable = () => (
@@ -163,6 +194,82 @@ export default function ModernAcademicScreen({ navigation }) {
     </View>
   );
 
+  const renderAttendance = () => {
+    if (loadingAttendance) {
+      return (
+        <View style={styles.centerContainer}>
+          <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading attendance...</Text>
+        </View>
+      );
+    }
+
+    if (attendance.length === 0) {
+      return (
+        <View style={styles.centerContainer}>
+          <Ionicons name="calendar-outline" size={64} color={theme.textSecondary} />
+          <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No attendance data available</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View>
+        {/* Overall Attendance */}
+        <Animated.View entering={SlideInRight}>
+          <View style={[styles.card, { backgroundColor: theme.surface }, shadows.md]}>
+            <View style={styles.cardContent}>
+              <Text style={[styles.overallTitle, { color: theme.text }]}>Overall Attendance</Text>
+              <View style={styles.overallContainer}>
+                <Text style={[styles.overallPercent, { color: getAttendanceColor(overallAttendance) }]}>
+                  {overallAttendance}%
+                </Text>
+                <View style={[styles.progressBar, styles.overallBar, { backgroundColor: theme.border }]}>
+                  <View 
+                    style={[
+                      styles.progressFill, 
+                      { backgroundColor: getAttendanceColor(overallAttendance), width: `${overallAttendance}%` }
+                    ]} 
+                  />
+                </View>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* Subject-wise Attendance */}
+        {attendance.map((item, index) => {
+          const color = getAttendanceColor(item.percentage);
+          return (
+            <Animated.View
+              key={item.subject}
+              entering={SlideInRight.delay(index * 100)}
+            >
+              <View style={[styles.card, { backgroundColor: theme.surface }, shadows.md]}>
+                <View style={[styles.colorBar, { backgroundColor: color }]} />
+                <View style={styles.cardContent}>
+                  <Text style={[styles.cardTitle, { color: theme.text }]}>{item.subject}</Text>
+                  <View style={styles.attendanceContainer}>
+                    <View style={[styles.progressBar, { backgroundColor: theme.border }]}>
+                      <View 
+                        style={[
+                          styles.progressFill, 
+                          { backgroundColor: color, width: `${item.percentage}%` }
+                        ]} 
+                      />
+                    </View>
+                    <Text style={[styles.attendancePercent, { color }]}>
+                      {item.percentage}%
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </Animated.View>
+          );
+        })}
+      </View>
+    );
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <LinearGradient
@@ -218,6 +325,7 @@ export default function ModernAcademicScreen({ navigation }) {
             {activeTab === 'timetable' && renderTimetable()}
             {activeTab === 'faculty' && renderFaculty()}
             {activeTab === 'syllabus' && renderSyllabus()}
+            {activeTab === 'attendance' && renderAttendance()}
           </Animated.View>
         </ScrollView>
       </LinearGradient>
@@ -387,5 +495,45 @@ const styles = StyleSheet.create({
   viewButtonText: {
     ...typography.bodyMedium,
     fontWeight: '600',
+  },
+  centerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xxl * 2,
+  },
+  loadingText: {
+    ...typography.body,
+    marginTop: spacing.md,
+  },
+  emptyText: {
+    ...typography.body,
+    marginTop: spacing.md,
+  },
+  overallTitle: {
+    ...typography.h4,
+    marginBottom: spacing.md,
+  },
+  overallContainer: {
+    alignItems: 'center',
+  },
+  overallPercent: {
+    ...typography.h1,
+    fontWeight: 'bold',
+    marginBottom: spacing.md,
+  },
+  overallBar: {
+    width: '100%',
+    height: 12,
+  },
+  attendanceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  attendancePercent: {
+    ...typography.h4,
+    fontWeight: 'bold',
+    minWidth: 50,
   },
 });
