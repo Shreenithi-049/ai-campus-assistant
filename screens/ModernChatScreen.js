@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInLeft, FadeInRight } from 'react-native-reanimated';
@@ -7,6 +7,8 @@ import { lightTheme, darkTheme, spacing, typography, borderRadius, shadows } fro
 import { useAuth } from '../contexts/AuthContext';
 import { buildAIContext } from '../services/aiContextService';
 import { sendMessageToAI } from '../services/geminiService';
+import { saveMessage, getUserChatHistory } from '../services/chatHistoryService';
+import { auth } from '../services/firebaseConfig';
 
 const MessageBubble = React.memo(({ item, theme }) => {
   const isAI = item.isAI;
@@ -67,22 +69,75 @@ const TypingIndicator = React.memo(({ theme }) => (
 export default function ModernChatScreen({ navigation, route }) {
   const { isDarkMode, toggleDarkMode, userProfile } = useAuth();
   const theme = isDarkMode ? darkTheme : lightTheme;
-  const [messages, setMessages] = useState([
-    { id: 1, text: 'Hello! I\'m your CampusAI assistant. How can I help you today?', isAI: true, timestamp: new Date() },
-  ]);
+  const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const flatListRef = useRef(null);
 
+  // Load chat history on mount
   useEffect(() => {
-    if (route.params?.query) {
+    loadChatHistory();
+  }, []);
+
+  // Handle query from route params
+  useEffect(() => {
+    if (route.params?.query && !isLoading) {
       handleSend(route.params.query);
     }
-  }, [route.params?.query]);
+  }, [route.params?.query, isLoading]);
+
+  const loadChatHistory = async () => {
+    try {
+      const userId = auth.currentUser?.uid;
+      console.log('🔍 DEBUG: Loading chat for userId:', userId);
+      
+      if (!userId) {
+        console.log('❌ DEBUG: No userId found');
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('📡 DEBUG: Fetching chat history from Firestore...');
+      const history = await getUserChatHistory(userId);
+      console.log('📜 DEBUG: Loaded messages count:', history.length);
+      console.log('📜 DEBUG: Messages:', history);
+      
+      if (history.length === 0) {
+        // Create and save welcome message
+        console.log('💾 DEBUG: No history found, creating welcome message');
+        const welcomeMsg = 'Hello! I\'m your CampusAI assistant. How can I help you today?';
+        await saveMessage(userId, welcomeMsg, 'bot');
+        console.log('✅ DEBUG: Welcome message saved');
+        
+        setMessages([{
+          id: 'welcome',
+          text: welcomeMsg,
+          isAI: true,
+          timestamp: new Date(),
+        }]);
+      } else {
+        console.log('✅ DEBUG: Setting messages from history');
+        setMessages(history);
+      }
+    } catch (error) {
+      console.error('❌ DEBUG: Error loading chat history:', error);
+      console.error('❌ DEBUG: Error details:', error.message);
+      Alert.alert('Error', 'Failed to load chat history: ' + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSend = useCallback(async (text = inputText) => {
     if (!text.trim() || isSending) return;
+
+    const userId = auth.currentUser?.uid;
+    if (!userId) {
+      Alert.alert('Error', 'You must be logged in to send messages');
+      return;
+    }
 
     const userMessage = {
       id: Date.now(),
@@ -97,19 +152,32 @@ export default function ModernChatScreen({ navigation, route }) {
     setIsSending(true);
 
     try {
+      // Save user message to Firestore
+      console.log('💾 DEBUG: Saving user message:', text.trim());
+      await saveMessage(userId, text.trim(), 'user');
+      console.log('✅ DEBUG: User message saved');
+
+      // Get AI response
       const context = await buildAIContext(userProfile);
       const result = await sendMessageToAI(text.trim(), context);
 
+      const aiResponseText = result.success 
+        ? result.response 
+        : "Sorry, I'm having trouble connecting right now. Please try again.";
+
       const aiResponse = {
         id: Date.now() + 1,
-        text: result.success 
-          ? result.response 
-          : "Sorry, I'm having trouble connecting right now. Please try again.",
+        text: aiResponseText,
         isAI: true,
         timestamp: new Date(),
       };
 
       setMessages(prev => [...prev, aiResponse]);
+
+      // Save AI response to Firestore
+      console.log('💾 DEBUG: Saving AI response');
+      await saveMessage(userId, aiResponseText, 'bot');
+      console.log('✅ DEBUG: AI response saved');
     } catch (error) {
       console.error('Chat error:', error);
       const errorResponse = {
@@ -119,6 +187,7 @@ export default function ModernChatScreen({ navigation, route }) {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, errorResponse]);
+      Alert.alert('Error', 'Failed to send message. Please try again.');
     } finally {
       setIsTyping(false);
       setIsSending(false);
@@ -158,15 +227,22 @@ export default function ModernChatScreen({ navigation, route }) {
           </TouchableOpacity>
         </View>
 
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          renderItem={renderMessage}
-          keyExtractor={keyExtractor}
-          contentContainerStyle={styles.messagesList}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-          ListFooterComponent={isTyping ? <TypingIndicator theme={theme} /> : null}
-        />}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.primary} />
+            <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading chat history...</Text>
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={keyExtractor}
+            contentContainerStyle={styles.messagesList}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+            ListFooterComponent={isTyping ? <TypingIndicator theme={theme} /> : null}
+          />
+        )}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
@@ -312,5 +388,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: spacing.sm,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    ...typography.body,
+    marginTop: spacing.md,
   },
 });

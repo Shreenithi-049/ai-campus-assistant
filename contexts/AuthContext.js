@@ -91,12 +91,17 @@ export const AuthProvider = ({ children }) => {
             setLoading(false);
           },
           (error) => {
-            console.error('Profile listener error:', error);
+            // Only log error if user is still authenticated
+            if (authUser) {
+              console.error('Profile listener error:', error);
+            }
             setUserProfile(null);
             setLoading(false);
           }
         );
       } else {
+        // Cleanup profile listener before clearing state
+        profileUnsubscribe();
         setUser(null);
         setUserProfile(null);
         setLoading(false);
@@ -104,8 +109,8 @@ export const AuthProvider = ({ children }) => {
     });
 
     return () => {
-      unsubscribe();
       profileUnsubscribe();
+      unsubscribe();
     };
   }, []);
 

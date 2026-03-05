@@ -38,18 +38,22 @@ service cloud.firestore {
       allow write: if false;
     }
     
-    // Event Registrations - NEW
+    // Event Registrations
     match /eventRegistrations/{docId} {
-      // Allow authenticated users to read their own registrations
       allow read: if request.auth != null && 
                     resource.data.userId == request.auth.uid;
-      
-      // Allow authenticated users to create registrations with their own userId
       allow create: if request.auth != null && 
                       request.auth.uid == request.resource.data.userId &&
                       request.resource.data.status == 'registered';
-      
-      // Prevent updates and deletes (admin only via console)
+      allow update, delete: if false;
+    }
+    
+    // Chat History - users can only access their own chat history
+    match /chatHistory/{docId} {
+      allow read: if request.auth != null && 
+                    resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && 
+                      request.auth.uid == request.resource.data.userId;
       allow update, delete: if false;
     }
     
