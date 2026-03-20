@@ -23,7 +23,7 @@ export const registerForEvent = async (userId, event) => {
       registeredAt: serverTimestamp(),
       status: 'registered'
     });
-    
+
     return { success: true };
   } catch (error) {
     console.error('Registration error:', error);

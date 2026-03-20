@@ -1,6 +1,5 @@
-// Firebase v9 Modular SDK
 import { initializeApp } from 'firebase/app';
-import { getAuth, browserLocalPersistence, setPersistence } from 'firebase/auth';
+import { getAuth, browserLocalPersistence, browserSessionPersistence, setPersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 /**
@@ -69,4 +68,5 @@ if (typeof window !== 'undefined') {
   });
 }
 
+export { browserSessionPersistence, setPersistence };
 export default app;

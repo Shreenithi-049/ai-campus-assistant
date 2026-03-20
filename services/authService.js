@@ -7,58 +7,59 @@ import {
   sendPasswordResetEmail,
   reload
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './firebaseConfig';
 import { validateCollegeEmail, validatePassword } from '../utils/validators';
 
 /**
- * Register new student with college email
- * Creates auth user and stores data in Firestore
- * Automatically sends verification email
+ * Signup: only allowed if admin has pre-created a student record with this email.
+ * Finds the existing doc, creates Firebase Auth user, then links uid to that doc.
  */
 export const registerStudent = async (email, password, additionalData = {}) => {
-  // Validate email domain
   const emailValidation = validateCollegeEmail(email);
-  if (!emailValidation.isValid) {
-    throw new Error(emailValidation.error);
+  if (!emailValidation.isValid) throw new Error(emailValidation.error);
+
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.isValid) throw new Error(passwordValidation.error);
+
+  // Step 1: Check if admin has pre-created a record for this email
+  const q = query(collection(db, 'students'), where('email', '==', email));
+  const snap = await getDocs(q);
+
+  if (snap.empty) {
+    throw new Error('You are not registered in the system. Please contact your admin.');
   }
 
-  // Validate password strength
-  const passwordValidation = validatePassword(password);
-  if (!passwordValidation.isValid) {
-    throw new Error(passwordValidation.error);
+  const existingDoc = snap.docs[0];
+
+  if (existingDoc.data().isRegistered) {
+    throw new Error('An account already exists for this email. Please login instead.');
   }
+
+  // Step 2: Create Firebase Auth user
+  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  const user = userCredential.user;
 
   try {
-    // Create Firebase Auth user
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
-
-    // Send verification email automatically
-    try {
-      await sendEmailVerification(user);
-    } catch (verifyError) {
-      console.error('Failed to send verification email:', verifyError);
-    }
-
-    // Store additional data in Firestore
-    await setDoc(doc(db, 'students', user.uid), {
-      email: user.email,
-      role: 'student',
-      emailVerified: false,
-      createdAt: serverTimestamp(),
-      ...additionalData,
-    });
-
-    return { success: true, user };
-  } catch (error) {
-    throw error;
+    await sendEmailVerification(user);
+  } catch (e) {
+    console.error('Verification email failed:', e);
   }
+
+  // Step 3: Update the EXISTING admin-created doc — do NOT create a new one
+  await updateDoc(doc(db, 'students', existingDoc.id), {
+    uid: user.uid,
+    fullName: additionalData.fullName || '',
+    emailVerified: false,
+    isRegistered: true,
+    registeredAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  return { success: true, user, docId: existingDoc.id };
 };
 
-/**
- * Login existing user
- */
+/** Login existing user */
 export const loginUser = async (email, password) => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -68,9 +69,7 @@ export const loginUser = async (email, password) => {
   }
 };
 
-/**
- * Logout current user
- */
+/** Logout current user */
 export const logoutUser = async () => {
   try {
     await signOut(auth);
@@ -80,43 +79,17 @@ export const logoutUser = async () => {
   }
 };
 
-/**
- * Get current user data from Firestore
- */
-export const getUserData = async (uid) => {
-  try {
-    const docRef = doc(db, 'students', uid);
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      return { success: true, data: docSnap.data() };
-    } else {
-      return { success: false, error: 'User data not found' };
-    }
-  } catch (error) {
-    throw error;
-  }
-};
-
-/**
- * Listen to auth state changes
- */
+/** Listen to auth state changes */
 export const subscribeToAuthChanges = (callback) => {
   return onAuthStateChanged(auth, callback);
 };
 
-/**
- * Send email verification to current user
- */
+/** Send email verification to current user */
 export const sendVerificationEmail = async () => {
   try {
     const user = auth.currentUser;
-    if (!user) {
-      throw new Error('No user logged in');
-    }
-    if (user.emailVerified) {
-      return { success: false, error: 'Email already verified' };
-    }
+    if (!user) throw new Error('No user logged in');
+    if (user.emailVerified) return { success: false, error: 'Email already verified' };
     await sendEmailVerification(user);
     return { success: true };
   } catch (error) {
@@ -124,9 +97,7 @@ export const sendVerificationEmail = async () => {
   }
 };
 
-/**
- * Send password reset email
- */
+/** Send password reset email */
 export const sendPasswordReset = async (email) => {
   try {
     await sendPasswordResetEmail(auth, email);
@@ -136,15 +107,11 @@ export const sendPasswordReset = async (email) => {
   }
 };
 
-/**
- * Reload current user to get latest email verification status
- */
+/** Reload current user to get latest email verification status */
 export const reloadUser = async () => {
   try {
     const user = auth.currentUser;
-    if (!user) {
-      throw new Error('No user logged in');
-    }
+    if (!user) throw new Error('No user logged in');
     await reload(user);
     return { success: true, emailVerified: user.emailVerified };
   } catch (error) {
@@ -152,11 +119,9 @@ export const reloadUser = async () => {
   }
 };
 
-/**
- * Check if profile is complete
- */
+/** Check if profile is complete */
 export const isProfileComplete = (profile) => {
   if (!profile) return false;
-  const requiredFields = ['fullName', 'studentId', 'year', 'semester'];
+  const requiredFields = ['fullName', 'studentId', 'year', 'department'];
   return requiredFields.every(field => profile[field] && profile[field].trim() !== '');
 };

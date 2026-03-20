@@ -9,8 +9,11 @@ const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export const BottomNavigation = ({ state, descriptors, navigation }) => {
   const [hoveredIndex, setHoveredIndex] = useState(null);
-  const { isDarkMode } = useAuth();
+  const { isDarkMode, isEmailVerified } = useAuth();
   const theme = isDarkMode ? darkTheme : lightTheme;
+
+  // Tabs that require email verification to access
+  const RESTRICTED_TABS = ['Academic', 'Events', 'Chat'];
 
   const tabs = [
     { name: 'Home', icon: 'home-outline', activeIcon: 'home', label: 'Home' },
@@ -28,7 +31,10 @@ export const BottomNavigation = ({ state, descriptors, navigation }) => {
         const isHovered = hoveredIndex === index;
         const tab = tabs[index];
 
+        const isRestricted = !isEmailVerified && RESTRICTED_TABS.includes(route.name);
+
         const onPress = () => {
+          if (isRestricted) return; // silently block
           const event = navigation.emit({
             type: 'tabPress',
             target: route.key,

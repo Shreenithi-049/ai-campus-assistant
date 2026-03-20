@@ -1,0 +1,35 @@
+{
+  "CSD": {
+    "3rd Year": {
+      "schedule": [
+        { "subject": "3D Modelling and Design", "time": "08:45 AM - 09:45 AM", "room": "Classroom", "professor": "Ms. I. Faiza", "day": "Monday" },
+        { "subject": "Data Analytics", "time": "09:45 AM - 10:45 AM", "room": "Classroom", "professor": "Ms. M. Sanmugapriya", "day": "Monday" },
+        { "subject": "Mini Project", "time": "11:15 AM - 01:15 PM", "room": "Lab", "professor": "Ms. M. Sanmugapriya", "day": "Monday" },
+        { "subject": "3D Modelling and Design", "time": "02:15 PM - 03:15 PM", "room": "Lab", "professor": "Ms. I. Faiza", "day": "Monday" },
+        { "subject": "Quantum Computing", "time": "03:15 PM - 04:15 PM", "room": "Classroom", "professor": "Dr. J Ashokan", "day": "Monday" },
+
+        { "subject": "VSD Lab", "time": "08:45 AM - 10:45 AM", "room": "Lab", "professor": "Ms. M. Reema Nisha", "day": "Tuesday" },
+        { "subject": "Data Analytics", "time": "12:15 PM - 01:15 PM", "room": "Classroom", "professor": "Ms. M. Sanmugapriya", "day": "Tuesday" },
+        { "subject": "Quantum Computing", "time": "02:15 PM - 03:15 PM", "room": "Classroom", "professor": "Dr. J Ashokan", "day": "Tuesday" },
+        { "subject": "3D Modelling and Design", "time": "03:15 PM - 04:15 PM", "room": "Lab", "professor": "Ms. I. Faiza", "day": "Tuesday" },
+
+        { "subject": "Data Analytics Lab", "time": "08:45 AM - 10:45 AM", "room": "Lab", "professor": "Ms. M. Sanmugapriya", "day": "Wednesday" },
+        { "subject": "Visual System Design", "time": "12:15 PM - 01:15 PM", "room": "Classroom", "professor": "Ms. M. Reema Nisha", "day": "Wednesday" },
+        { "subject": "3D Modelling and Design", "time": "02:15 PM - 03:15 PM", "room": "Classroom", "professor": "Ms. I. Faiza", "day": "Wednesday" },
+        { "subject": "Quantum Computing", "time": "03:15 PM - 04:15 PM", "room": "Classroom", "professor": "Dr. J Ashokan", "day": "Wednesday" },
+
+        { "subject": "Visual System Design", "time": "08:45 AM - 09:45 AM", "room": "Classroom", "professor": "Ms. M. Reema Nisha", "day": "Thursday" },
+        { "subject": "Data Analytics", "time": "09:45 AM - 10:45 AM", "room": "Classroom", "professor": "Ms. M. Sanmugapriya", "day": "Thursday" },
+        { "subject": "Quantum Computing", "time": "11:15 AM - 12:15 PM", "room": "Classroom", "professor": "Dr. J Ashokan", "day": "Thursday" },
+        { "subject": "3D Modelling Lab", "time": "12:15 PM - 04:15 PM", "room": "Lab", "professor": "Ms. I. Faiza", "day": "Thursday" },
+
+        { "subject": "Data Analytics", "time": "08:45 AM - 09:45 AM", "room": "Classroom", "professor": "Ms. M. Sanmugapriya", "day": "Friday" },
+        { "subject": "Visual System Design", "time": "09:45 AM - 10:45 AM", "room": "Classroom", "professor": "Ms. M. Reema Nisha", "day": "Friday" },
+        { "subject": "Quantum Computing", "time": "11:15 AM - 12:15 PM", "room": "Classroom", "professor": "Dr. J Ashokan", "day": "Friday" },
+        { "subject": "Placement", "time": "12:15 PM - 01:15 PM", "room": "Seminar Hall", "professor": "Mr. K Kumar", "day": "Friday" },
+        { "subject": "Visual System Design", "time": "02:15 PM - 03:15 PM", "room": "Classroom", "professor": "Ms. M. Reema Nisha", "day": "Friday" },
+        { "subject": "TWM", "time": "03:15 PM - 04:15 PM", "room": "Classroom", "professor": "Dr. K Rajalakshmi", "day": "Friday" }
+      ]
+    }
+  }
+}

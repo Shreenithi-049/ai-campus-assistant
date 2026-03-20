@@ -1,0 +1,947 @@
+[
+  {
+    "email": "727723eucd001@skcet.ac.in",
+    "fullName": "Student 1",
+    "studentId": "727723eucd001",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 78,
+      "Data Analytics": 71,
+      "Visual System Design": 70,
+      "3D Modelling and Design": 76
+    }
+  },
+  {
+    "email": "727723eucd002@skcet.ac.in",
+    "fullName": "Student 2",
+    "studentId": "727723eucd002",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 83,
+      "Data Analytics": 87,
+      "Visual System Design": 91,
+      "3D Modelling and Design": 87
+    }
+  },
+  {
+    "email": "727723eucd003@skcet.ac.in",
+    "fullName": "Student 3",
+    "studentId": "727723eucd003",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 58,
+      "Data Analytics": 63,
+      "Visual System Design": 62,
+      "3D Modelling and Design": 63
+    }
+  },
+  {
+    "email": "727723eucd004@skcet.ac.in",
+    "fullName": "Student 4",
+    "studentId": "727723eucd004",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 75,
+      "Data Analytics": 72,
+      "Visual System Design": 75,
+      "3D Modelling and Design": 78
+    }
+  },
+  {
+    "email": "727723eucd005@skcet.ac.in",
+    "fullName": "Student 5",
+    "studentId": "727723eucd005",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 85,
+      "Data Analytics": 81,
+      "Visual System Design": 82,
+      "3D Modelling and Design": 80
+    }
+  },
+  {
+    "email": "727723eucd006@skcet.ac.in",
+    "fullName": "Student 6",
+    "studentId": "727723eucd006",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 61,
+      "Data Analytics": 58,
+      "Visual System Design": 59,
+      "3D Modelling and Design": 60
+    }
+  },
+  {
+    "email": "727723eucd007@skcet.ac.in",
+    "fullName": "Student 7",
+    "studentId": "727723eucd007",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 70,
+      "Data Analytics": 78,
+      "Visual System Design": 72,
+      "3D Modelling and Design": 72
+    }
+  },
+  {
+    "email": "727723eucd008@skcet.ac.in",
+    "fullName": "Student 8",
+    "studentId": "727723eucd008",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 87,
+      "Data Analytics": 90,
+      "Visual System Design": 91,
+      "3D Modelling and Design": 80
+    }
+  },
+  {
+    "email": "727723eucd009@skcet.ac.in",
+    "fullName": "Student 9",
+    "studentId": "727723eucd009",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 64,
+      "Data Analytics": 62,
+      "Visual System Design": 65,
+      "3D Modelling and Design": 62
+    }
+  },
+  {
+    "email": "727723eucd010@skcet.ac.in",
+    "fullName": "Student 10",
+    "studentId": "727723eucd010",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 70,
+      "Data Analytics": 71,
+      "Visual System Design": 73,
+      "3D Modelling and Design": 71
+    }
+  },
+  {
+    "email": "727723eucd011@skcet.ac.in",
+    "fullName": "Student 11",
+    "studentId": "727723eucd011",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 81,
+      "Data Analytics": 81,
+      "Visual System Design": 87,
+      "3D Modelling and Design": 84
+    }
+  },
+  {
+    "email": "727723eucd012@skcet.ac.in",
+    "fullName": "Student 12",
+    "studentId": "727723eucd012",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 60,
+      "Data Analytics": 63,
+      "Visual System Design": 61,
+      "3D Modelling and Design": 62
+    }
+  },
+  {
+    "email": "727723eucd013@skcet.ac.in",
+    "fullName": "Student 13",
+    "studentId": "727723eucd013",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 74,
+      "Data Analytics": 72,
+      "Visual System Design": 77,
+      "3D Modelling and Design": 72
+    }
+  },
+  {
+    "email": "727723eucd014@skcet.ac.in",
+    "fullName": "Student 14",
+    "studentId": "727723eucd014",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 91,
+      "Data Analytics": 88,
+      "Visual System Design": 82,
+      "3D Modelling and Design": 92
+    }
+  },
+  {
+    "email": "727723eucd015@skcet.ac.in",
+    "fullName": "Student 15",
+    "studentId": "727723eucd015",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 64,
+      "Data Analytics": 58,
+      "Visual System Design": 62,
+      "3D Modelling and Design": 64
+    }
+  },
+  {
+    "email": "727723eucd016@skcet.ac.in",
+    "fullName": "Student 16",
+    "studentId": "727723eucd016",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 70,
+      "Data Analytics": 75,
+      "Visual System Design": 76,
+      "3D Modelling and Design": 73
+    }
+  },
+  {
+    "email": "727723eucd017@skcet.ac.in",
+    "fullName": "Student 17",
+    "studentId": "727723eucd017",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 81,
+      "Data Analytics": 86,
+      "Visual System Design": 80,
+      "3D Modelling and Design": 83
+    }
+  },
+  {
+    "email": "727723eucd018@skcet.ac.in",
+    "fullName": "Student 18",
+    "studentId": "727723eucd018",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 60,
+      "Data Analytics": 59,
+      "Visual System Design": 58,
+      "3D Modelling and Design": 61
+    }
+  },
+  {
+    "email": "727723eucd019@skcet.ac.in",
+    "fullName": "Student 19",
+    "studentId": "727723eucd019",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 72,
+      "Data Analytics": 72,
+      "Visual System Design": 73,
+      "3D Modelling and Design": 75
+    }
+  },
+  {
+    "email": "727723eucd020@skcet.ac.in",
+    "fullName": "Student 20",
+    "studentId": "727723eucd020",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 84,
+      "Data Analytics": 90,
+      "Visual System Design": 88,
+      "3D Modelling and Design": 92
+    }
+  },
+  {
+    "email": "727723eucd021@skcet.ac.in",
+    "fullName": "Student 21",
+    "studentId": "727723eucd021",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 62,
+      "Data Analytics": 65,
+      "Visual System Design": 64,
+      "3D Modelling and Design": 64
+    }
+  },
+  {
+    "email": "727723eucd022@skcet.ac.in",
+    "fullName": "Student 22",
+    "studentId": "727723eucd022",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 70,
+      "Data Analytics": 74,
+      "Visual System Design": 73,
+      "3D Modelling and Design": 70
+    }
+  },
+  {
+    "email": "727723eucd023@skcet.ac.in",
+    "fullName": "Student 23",
+    "studentId": "727723eucd023",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 83,
+      "Data Analytics": 85,
+      "Visual System Design": 89,
+      "3D Modelling and Design": 88
+    }
+  },
+  {
+    "email": "727723eucd024@skcet.ac.in",
+    "fullName": "Student 24",
+    "studentId": "727723eucd024",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 58,
+      "Data Analytics": 58,
+      "Visual System Design": 59,
+      "3D Modelling and Design": 65
+    }
+  },
+  {
+    "email": "727723eucd025@skcet.ac.in",
+    "fullName": "Student 25",
+    "studentId": "727723eucd025",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 75,
+      "Data Analytics": 73,
+      "Visual System Design": 74,
+      "3D Modelling and Design": 74
+    }
+  },
+  {
+    "email": "727723eucd026@skcet.ac.in",
+    "fullName": "Student 26",
+    "studentId": "727723eucd026",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 90,
+      "Data Analytics": 89,
+      "Visual System Design": 86,
+      "3D Modelling and Design": 84
+    }
+  },
+  {
+    "email": "727723eucd027@skcet.ac.in",
+    "fullName": "Student 27",
+    "studentId": "727723eucd027",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 58,
+      "Data Analytics": 62,
+      "Visual System Design": 60,
+      "3D Modelling and Design": 64
+    }
+  },
+  {
+    "email": "727723eucd028@skcet.ac.in",
+    "fullName": "Student 28",
+    "studentId": "727723eucd028",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 70,
+      "Data Analytics": 71,
+      "Visual System Design": 77,
+      "3D Modelling and Design": 70
+    }
+  },
+  {
+    "email": "727723eucd029@skcet.ac.in",
+    "fullName": "Student 29",
+    "studentId": "727723eucd029",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 91,
+      "Data Analytics": 88,
+      "Visual System Design": 92,
+      "3D Modelling and Design": 84
+    }
+  },
+  {
+    "email": "727723eucd030@skcet.ac.in",
+    "fullName": "Student 30",
+    "studentId": "727723eucd030",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 64,
+      "Data Analytics": 59,
+      "Visual System Design": 61,
+      "3D Modelling and Design": 63
+    }
+  },
+  {
+    "email": "727723eucd031@skcet.ac.in",
+    "fullName": "Student 31",
+    "studentId": "727723eucd031",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 74,
+      "Data Analytics": 76,
+      "Visual System Design": 71,
+      "3D Modelling and Design": 76
+    }
+  },
+  {
+    "email": "727723eucd032@skcet.ac.in",
+    "fullName": "Student 32",
+    "studentId": "727723eucd032",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 80,
+      "Data Analytics": 88,
+      "Visual System Design": 86,
+      "3D Modelling and Design": 84
+    }
+  },
+  {
+    "email": "727723eucd033@skcet.ac.in",
+    "fullName": "Student 33",
+    "studentId": "727723eucd033",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 58,
+      "Data Analytics": 64,
+      "Visual System Design": 59,
+      "3D Modelling and Design": 63
+    }
+  },
+  {
+    "email": "727723eucd034@skcet.ac.in",
+    "fullName": "Student 34",
+    "studentId": "727723eucd034",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 71,
+      "Data Analytics": 76,
+      "Visual System Design": 78,
+      "3D Modelling and Design": 76
+    }
+  },
+  {
+    "email": "727723eucd035@skcet.ac.in",
+    "fullName": "Student 35",
+    "studentId": "727723eucd035",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 87,
+      "Data Analytics": 81,
+      "Visual System Design": 81,
+      "3D Modelling and Design": 92
+    }
+  },
+  {
+    "email": "727723eucd036@skcet.ac.in",
+    "fullName": "Student 36",
+    "studentId": "727723eucd036",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 62,
+      "Data Analytics": 60,
+      "Visual System Design": 63,
+      "3D Modelling and Design": 60
+    }
+  },
+  {
+    "email": "727723eucd037@skcet.ac.in",
+    "fullName": "Student 37",
+    "studentId": "727723eucd037",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 76,
+      "Data Analytics": 72,
+      "Visual System Design": 75,
+      "3D Modelling and Design": 71
+    }
+  },
+  {
+    "email": "727723eucd038@skcet.ac.in",
+    "fullName": "Student 38",
+    "studentId": "727723eucd038",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 88,
+      "Data Analytics": 81,
+      "Visual System Design": 84,
+      "3D Modelling and Design": 90
+    }
+  },
+  {
+    "email": "727723eucd039@skcet.ac.in",
+    "fullName": "Student 39",
+    "studentId": "727723eucd039",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 63,
+      "Data Analytics": 62,
+      "Visual System Design": 62,
+      "3D Modelling and Design": 64
+    }
+  },
+  {
+    "email": "727723eucd040@skcet.ac.in",
+    "fullName": "Student 40",
+    "studentId": "727723eucd040",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 78,
+      "Data Analytics": 71,
+      "Visual System Design": 74,
+      "3D Modelling and Design": 70
+    }
+  },
+  {
+    "email": "727723eucd041@skcet.ac.in",
+    "fullName": "Student 41",
+    "studentId": "727723eucd041",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 91,
+      "Data Analytics": 89,
+      "Visual System Design": 86,
+      "3D Modelling and Design": 85
+    }
+  },
+  {
+    "email": "727723eucd042@skcet.ac.in",
+    "fullName": "Student 42",
+    "studentId": "727723eucd042",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 64,
+      "Data Analytics": 62,
+      "Visual System Design": 59,
+      "3D Modelling and Design": 61
+    }
+  },
+  {
+    "email": "727723eucd043@skcet.ac.in",
+    "fullName": "Student 43",
+    "studentId": "727723eucd043",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 75,
+      "Data Analytics": 71,
+      "Visual System Design": 71,
+      "3D Modelling and Design": 71
+    }
+  },
+  {
+    "email": "727723eucd044@skcet.ac.in",
+    "fullName": "Student 44",
+    "studentId": "727723eucd044",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 83,
+      "Data Analytics": 82,
+      "Visual System Design": 86,
+      "3D Modelling and Design": 91
+    }
+  },
+  {
+    "email": "727723eucd045@skcet.ac.in",
+    "fullName": "Student 45",
+    "studentId": "727723eucd045",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 60,
+      "Data Analytics": 63,
+      "Visual System Design": 58,
+      "3D Modelling and Design": 58
+    }
+  },
+  {
+    "email": "727723eucd046@skcet.ac.in",
+    "fullName": "Student 46",
+    "studentId": "727723eucd046",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 74,
+      "Data Analytics": 74,
+      "Visual System Design": 78,
+      "3D Modelling and Design": 77
+    }
+  },
+  {
+    "email": "727723eucd047@skcet.ac.in",
+    "fullName": "Student 47",
+    "studentId": "727723eucd047",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 85,
+      "Data Analytics": 89,
+      "Visual System Design": 80,
+      "3D Modelling and Design": 80
+    }
+  },
+  {
+    "email": "727723eucd048@skcet.ac.in",
+    "fullName": "Student 48",
+    "studentId": "727723eucd048",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 65,
+      "Data Analytics": 61,
+      "Visual System Design": 60,
+      "3D Modelling and Design": 63
+    }
+  },
+  {
+    "email": "727723eucd049@skcet.ac.in",
+    "fullName": "Student 49",
+    "studentId": "727723eucd049",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 77,
+      "Data Analytics": 78,
+      "Visual System Design": 73,
+      "3D Modelling and Design": 76
+    }
+  },
+  {
+    "email": "727723eucd050@skcet.ac.in",
+    "fullName": "Student 50",
+    "studentId": "727723eucd050",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 81,
+      "Data Analytics": 87,
+      "Visual System Design": 84,
+      "3D Modelling and Design": 83
+    }
+  },
+  {
+    "email": "727723eucd051@skcet.ac.in",
+    "fullName": "Student 51",
+    "studentId": "727723eucd051",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 62,
+      "Data Analytics": 63,
+      "Visual System Design": 58,
+      "3D Modelling and Design": 64
+    }
+  },
+  {
+    "email": "727723eucd052@skcet.ac.in",
+    "fullName": "Student 52",
+    "studentId": "727723eucd052",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 76,
+      "Data Analytics": 78,
+      "Visual System Design": 73,
+      "3D Modelling and Design": 70
+    }
+  },
+  {
+    "email": "727723eucd053@skcet.ac.in",
+    "fullName": "Student 53",
+    "studentId": "727723eucd053",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 81,
+      "Data Analytics": 83,
+      "Visual System Design": 90,
+      "3D Modelling and Design": 87
+    }
+  },
+  {
+    "email": "727723eucd054@skcet.ac.in",
+    "fullName": "Student 54",
+    "studentId": "727723eucd054",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 64,
+      "Data Analytics": 65,
+      "Visual System Design": 62,
+      "3D Modelling and Design": 60
+    }
+  },
+  {
+    "email": "727723eucd055@skcet.ac.in",
+    "fullName": "Student 55",
+    "studentId": "727723eucd055",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 78,
+      "Data Analytics": 73,
+      "Visual System Design": 70,
+      "3D Modelling and Design": 72
+    }
+  },
+  {
+    "email": "727723eucd056@skcet.ac.in",
+    "fullName": "Student 56",
+    "studentId": "727723eucd056",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 90,
+      "Data Analytics": 90,
+      "Visual System Design": 83,
+      "3D Modelling and Design": 92
+    }
+  },
+  {
+    "email": "727723eucd057@skcet.ac.in",
+    "fullName": "Student 57",
+    "studentId": "727723eucd057",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 61,
+      "Data Analytics": 58,
+      "Visual System Design": 60,
+      "3D Modelling and Design": 63
+    }
+  },
+  {
+    "email": "727723eucd058@skcet.ac.in",
+    "fullName": "Student 58",
+    "studentId": "727723eucd058",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 73,
+      "Data Analytics": 75,
+      "Visual System Design": 76,
+      "3D Modelling and Design": 77
+    }
+  },
+  {
+    "email": "727723eucd059@skcet.ac.in",
+    "fullName": "Student 59",
+    "studentId": "727723eucd059",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 89,
+      "Data Analytics": 90,
+      "Visual System Design": 91,
+      "3D Modelling and Design": 83
+    }
+  },
+  {
+    "email": "727723eucd060@skcet.ac.in",
+    "fullName": "Student 60",
+    "studentId": "727723eucd060",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 61,
+      "Data Analytics": 62,
+      "Visual System Design": 60,
+      "3D Modelling and Design": 58
+    }
+  },
+  {
+    "email": "727723eucd061@skcet.ac.in",
+    "fullName": "Student 61",
+    "studentId": "727723eucd061",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 70,
+      "Data Analytics": 77,
+      "Visual System Design": 76,
+      "3D Modelling and Design": 73
+    }
+  },
+  {
+    "email": "727723eucd062@skcet.ac.in",
+    "fullName": "Student 62",
+    "studentId": "727723eucd062",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 87,
+      "Data Analytics": 90,
+      "Visual System Design": 85,
+      "3D Modelling and Design": 91
+    }
+  },
+  {
+    "email": "727723eucd063@skcet.ac.in",
+    "fullName": "Student 63",
+    "studentId": "727723eucd063",
+    "role": "student",
+    "year": "3rd Year",
+    "semester": "6th Semester",
+    "department": "CSD",
+    "attendance": {
+      "Quantum Computing": 65,
+      "Data Analytics": 63,
+      "Visual System Design": 63,
+      "3D Modelling and Design": 58
+    }
+  }
+]

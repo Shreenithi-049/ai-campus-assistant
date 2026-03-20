@@ -226,9 +226,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: spacing.md,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    ...(Platform.OS === 'web'
+      ? { textShadow: '0px 2px 4px rgba(0,0,0,0.2)' }
+      : { textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }
+    ),
   },
   heroSubtitle: {
     fontSize: 20,
@@ -294,11 +295,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: spacing.xl,
     marginBottom: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0px 8px 16px rgba(0,0,0,0.15)' }
+      : { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 8 }
+    ),
   },
   errorContainer: {
     flexDirection: 'row',
@@ -341,11 +341,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     minHeight: 52,
     justifyContent: 'center',
-    shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0px 4px 8px rgba(59,130,246,0.3)' }
+      : { shadowColor: '#3B82F6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }
+    ),
   },
   buttonText: {
     ...typography.bodyMedium,

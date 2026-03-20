@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../services/firebaseConfig';
 import { useAuth } from '../contexts/AuthContext';
 import { lightTheme, darkTheme, spacing, typography, borderRadius, shadows } from '../constants/modernTheme';
+import { DEPARTMENT_MAP, YEARS } from '../constants/departments';
 
 export default function EditProfileScreen({ navigation }) {
-  const { user, userProfile, refreshUserProfile } = useAuth();
+  const { user, userProfile } = useAuth();
   const [isDark, setIsDark] = useState(false);
   const theme = isDark ? darkTheme : lightTheme;
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
-    studentId: '',
     year: '',
     semester: '',
     dateOfBirth: '',
@@ -25,11 +26,13 @@ export default function EditProfileScreen({ navigation }) {
     emergencyContact: '',
   });
 
+  const formInitialized = React.useRef(false);
+
   useEffect(() => {
-    if (userProfile) {
+    if (userProfile && !formInitialized.current) {
+      formInitialized.current = true;
       setFormData({
         fullName: userProfile.fullName || '',
-        studentId: userProfile.studentId || '',
         year: userProfile.year || '',
         semester: userProfile.semester || '',
         dateOfBirth: userProfile.dateOfBirth || '',
@@ -43,25 +46,26 @@ export default function EditProfileScreen({ navigation }) {
   }, [userProfile]);
 
   const handleSave = async () => {
+    if (!userProfile?._docId) {
+      Alert.alert('Error', 'Profile not loaded yet. Please wait a moment and try again.');
+      return;
+    }
     if (!formData.fullName.trim()) {
       Alert.alert('Error', 'Full name is required');
       return;
     }
-
     setLoading(true);
     try {
-      const userRef = doc(db, 'students', user.uid);
-      await updateDoc(userRef, {
+      console.log('💾 Saving profile — docId:', userProfile._docId, 'uid:', user?.uid);
+      await updateDoc(doc(db, 'students', userProfile._docId), {
         ...formData,
         updatedAt: serverTimestamp(),
       });
-      
-      await refreshUserProfile();
       Alert.alert('Success', 'Profile updated successfully');
       navigation.goBack();
     } catch (error) {
-      console.error('Update error:', error);
-      Alert.alert('Error', 'Failed to update profile');
+      console.error('Update error:', error.code, error.message);
+      Alert.alert('Error', `Failed to update profile: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -84,13 +88,31 @@ export default function EditProfileScreen({ navigation }) {
     </View>
   );
 
+  const renderSelect = (label, field, options) => (
+    <View style={styles.inputContainer}>
+      <Text style={[styles.label, { color: theme.text }]}>{label}</Text>
+      <View style={[styles.input, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
+        <Picker
+          selectedValue={formData[field]}
+          onValueChange={(val) => setFormData({ ...formData, [field]: val })}
+          style={{ color: theme.text, flex: 1 }}
+          enabled={!loading}
+        >
+          <Picker.Item label={`Select ${label}`} value="" />
+          {options.map(({ value, label: optLabel }) => (
+            <Picker.Item key={value} label={optLabel} value={value} />
+          ))}
+        </Picker>
+      </View>
+    </View>
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <LinearGradient
         colors={isDark ? ['#0F172A', '#1E293B'] : ['#FFFFFF', '#F8FAFC']}
         style={styles.gradient}
       >
-        {/* Header */}
         <View style={[styles.header, { backgroundColor: theme.surface }, shadows.sm]}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={theme.text} />
@@ -103,20 +125,19 @@ export default function EditProfileScreen({ navigation }) {
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {renderInput('Full Name', 'fullName', 'Enter your full name')}
-          {renderInput('Student ID', 'studentId', 'Enter your student ID')}
-          {renderInput('Year', 'year', 'e.g., 3rd Year')}
+          {renderSelect('Department', 'department', Object.entries(DEPARTMENT_MAP).map(([v, l]) => ({ value: v, label: `${v} — ${l}` })))}
+          {renderSelect('Year', 'year', YEARS.map(y => ({ value: y, label: y })))}
           {renderInput('Semester', 'semester', 'e.g., 6th Semester')}
           {renderInput('Date of Birth', 'dateOfBirth', 'DD/MM/YYYY')}
-          {renderInput('Department', 'department', 'e.g., Computer Science')}
           {renderInput('Phone Number', 'phoneNumber', 'Enter your phone number', 'phone-pad')}
           {renderInput('Gender', 'gender', 'Male/Female/Other')}
           {renderInput('Blood Group', 'bloodGroup', 'e.g., O+')}
           {renderInput('Emergency Contact', 'emergencyContact', 'Emergency contact number', 'phone-pad')}
 
           <TouchableOpacity
-            style={[styles.saveButton, { backgroundColor: theme.primary, opacity: loading ? 0.7 : 1 }, shadows.md]}
+            style={[styles.saveButton, { backgroundColor: theme.primary, opacity: (loading || !userProfile?._docId) ? 0.7 : 1 }, shadows.md]}
             onPress={handleSave}
-            disabled={loading}
+            disabled={loading || !userProfile?._docId}
           >
             {loading ? (
               <ActivityIndicator color="#FFFFFF" />
@@ -134,12 +155,8 @@ export default function EditProfileScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  gradient: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  gradient: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -148,20 +165,10 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     paddingHorizontal: spacing.lg,
   },
-  headerTitle: {
-    ...typography.h3,
-  },
-  content: {
-    flex: 1,
-    padding: spacing.lg,
-  },
-  inputContainer: {
-    marginBottom: spacing.md,
-  },
-  label: {
-    ...typography.smallMedium,
-    marginBottom: spacing.sm,
-  },
+  headerTitle: { ...typography.h3 },
+  content: { flex: 1, padding: spacing.lg },
+  inputContainer: { marginBottom: spacing.md },
+  label: { ...typography.smallMedium, marginBottom: spacing.sm },
   input: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -169,11 +176,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     borderWidth: 1,
   },
-  textInput: {
-    ...typography.body,
-    flex: 1,
-    paddingVertical: 0,
-  },
+  textInput: { ...typography.body, flex: 1, paddingVertical: 0 },
   saveButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -184,9 +187,5 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xxl,
     gap: spacing.sm,
   },
-  saveButtonText: {
-    ...typography.h4,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
+  saveButtonText: { ...typography.h4, color: '#FFFFFF', fontWeight: '600' },
 });

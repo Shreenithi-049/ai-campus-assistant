@@ -1,18 +1,30 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { subscribeToAuthChanges, loginUser, logoutUser } from '../services/authService';
+import { reload } from 'firebase/auth';
+import { doc, updateDoc, collection, query, where, getDocs, serverTimestamp } from 'firebase/firestore';
+import { auth, db, browserSessionPersistence, setPersistence } from '../services/firebaseConfig';
+import {
+  subscribeToAuthChanges,
+  loginUser,
+  logoutUser,
+  sendVerificationEmail,
+} from '../services/authService';
 import { subscribeToUserProfile } from '../services/firestoreService';
 
 const AuthContext = createContext({});
-const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const SESSION_DURATION = 24 * 60 * 60 * 1000;
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser]               = useState(null);
   const [userProfile, setUserProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState(null);
+  const [isDarkMode, setIsDarkMode]   = useState(false);
+
+  // Single source of truth: Firebase Auth token is the gate.
+  // Firestore profile emailVerified is synced as a side-effect, not a gate.
+  const isEmailVerified = user?.emailVerified === true;
 
   useEffect(() => {
     AsyncStorage.getItem('darkMode').then(value => {
@@ -21,39 +33,49 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const toggleDarkMode = async () => {
-    const newValue = !isDarkMode;
-    setIsDarkMode(newValue);
-    await AsyncStorage.setItem('darkMode', newValue.toString());
+    const next = !isDarkMode;
+    setIsDarkMode(next);
+    await AsyncStorage.setItem('darkMode', next.toString());
   };
 
   const logout = async () => {
-    console.log('Logout function called');
     try {
-      console.log('Calling logoutUser...');
-      await logoutUser();
-      console.log('Clearing AsyncStorage...');
-      await AsyncStorage.clear();
-      console.log('Setting user and profile to null...');
+      // Immediately clear React state — critical for web where onAuthStateChanged
+      // can be delayed due to IndexedDB persistence flushing
       setUser(null);
       setUserProfile(null);
-      console.log('Logout successful');
+      setLoading(false);
+
+      await AsyncStorage.clear();
+
+      // On web: switch to session persistence before signOut so the browser
+      // does not restore the session from IndexedDB on next render cycle
+      if (Platform.OS === 'web') {
+        await setPersistence(auth, browserSessionPersistence);
+      }
+
+      await logoutUser();
+
       return { success: true };
-    } catch (error) {
-      console.error('Logout error:', error);
-      return { success: false, error: error.message };
+    } catch (err) {
+      console.error('Logout error:', err);
+      // Restore loading=false so the app doesn't freeze on error
+      setLoading(false);
+      return { success: false, error: err.message };
     }
   };
 
-  // Check session expiry
+  // Session expiry check
   useEffect(() => {
+    if (!user) return;
     const checkSession = async () => {
       try {
-        const loginTimestamp = await AsyncStorage.getItem('loginTimestamp');
-        if (loginTimestamp && user) {
-          const currentTime = Date.now();
-          const elapsed = currentTime - parseInt(loginTimestamp);
-          
-          if (elapsed > SESSION_DURATION) {
+        const ts = await AsyncStorage.getItem('loginTimestamp');
+        if (ts && Date.now() - parseInt(ts) > SESSION_DURATION) {
+          if (Platform.OS === 'web') {
+            window.alert('Your session has expired. Please login again.');
+            await logout();
+          } else {
             Alert.alert(
               'Session Expired',
               'Your session has expired. Please login again.',
@@ -61,47 +83,56 @@ export const AuthProvider = ({ children }) => {
             );
           }
         }
-      } catch (error) {
-        console.error('Session check error:', error);
+      } catch (err) {
+        console.error('Session check error:', err);
       }
     };
-
     checkSession();
     const interval = setInterval(checkSession, 60000);
-    
     return () => clearInterval(interval);
   }, [user]);
 
+  // Auth state listener + Firestore profile listener
   useEffect(() => {
-    let profileUnsubscribe = () => {};
-    
-    const unsubscribe = subscribeToAuthChanges(async (authUser) => {
-      setLoading(true);
+    let profileUnsub = () => {};
+
+    const authUnsub = subscribeToAuthChanges(async (authUser) => {
+      console.log('🔐 Auth state changed:', authUser ? `User: ${authUser.email}` : 'User: null');
+      profileUnsub();
+
       if (authUser) {
+        setLoading(true);
+
+        // Sync emailVerified to Firestore using uid-based query
+        if (authUser.emailVerified) {
+          getDocs(query(collection(db, 'students'), where('uid', '==', authUser.uid)))
+            .then((snap) => {
+              if (!snap.empty) {
+                updateDoc(doc(db, 'students', snap.docs[0].id), {
+                  emailVerified: true,
+                  updatedAt: serverTimestamp(),
+                }).catch(console.error);
+              }
+            })
+            .catch(console.error);
+        }
+
         setUser(authUser);
-        // Setup real-time profile listener
-        profileUnsubscribe = subscribeToUserProfile(
+
+        profileUnsub = subscribeToUserProfile(
           authUser.uid,
           (result) => {
-            if (result.success) {
-              setUserProfile(result.data);
-            } else {
-              setUserProfile(null);
-            }
+            setUserProfile(result.success ? result.data : null);
             setLoading(false);
           },
-          (error) => {
-            // Only log error if user is still authenticated
-            if (authUser) {
-              console.error('Profile listener error:', error);
-            }
+          (err) => {
+            console.error('Profile listener error:', err);
             setUserProfile(null);
             setLoading(false);
           }
         );
       } else {
-        // Cleanup profile listener before clearing state
-        profileUnsubscribe();
+        // Do NOT setLoading(true) here — logout already cleared state immediately
         setUser(null);
         setUserProfile(null);
         setLoading(false);
@@ -109,8 +140,8 @@ export const AuthProvider = ({ children }) => {
     });
 
     return () => {
-      profileUnsubscribe();
-      unsubscribe();
+      profileUnsub();
+      authUnsub();
     };
   }, []);
 
@@ -122,16 +153,44 @@ export const AuthProvider = ({ children }) => {
         await AsyncStorage.setItem('loginTimestamp', Date.now().toString());
       }
       return { success: true };
-    } catch (error) {
-      const errorMessage = getAuthErrorMessage(error.code);
-      setError(errorMessage);
-      return { success: false, error: errorMessage };
+    } catch (err) {
+      const msg = getAuthErrorMessage(err.code);
+      setError(msg);
+      return { success: false, error: msg };
     }
   };
 
-  const refreshUserProfile = () => {
-    // Profile updates automatically via real-time listener
-    // This function kept for compatibility
+  const resendVerification = async () => {
+    try {
+      await sendVerificationEmail();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const checkEmailVerified = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return false;
+    try {
+      await reload(currentUser);
+      const refreshed = auth.currentUser;
+      if (refreshed?.emailVerified) {
+        setUser(refreshed);
+        // Update the correct doc using _docId stored in userProfile
+        if (userProfile?._docId) {
+          updateDoc(doc(db, 'students', userProfile._docId), {
+            emailVerified: true,
+            updatedAt: serverTimestamp(),
+          }).catch(console.error);
+        }
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('checkEmailVerified error:', err);
+      return false;
+    }
   };
 
   const value = {
@@ -139,10 +198,13 @@ export const AuthProvider = ({ children }) => {
     userProfile,
     loading,
     error,
-    isAuthenticated: !!user && !!userProfile,
+    isAuthenticated: !!user,
+    isEmailVerified,
     login,
     logout,
-    refreshUserProfile,
+    resendVerification,
+    checkEmailVerified,
+    refreshUserProfile: () => {},
     isDarkMode,
     toggleDarkMode,
   };
@@ -152,29 +214,19 @@ export const AuthProvider = ({ children }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 };
 
-const getAuthErrorMessage = (errorCode) => {
-  switch (errorCode) {
-    case 'auth/invalid-email':
-      return 'Invalid email address format.';
-    case 'auth/user-disabled':
-      return 'This account has been disabled.';
-    case 'auth/user-not-found':
-      return 'No account found with this email.';
-    case 'auth/wrong-password':
-      return 'Incorrect password. Please try again.';
-    case 'auth/invalid-credential':
-      return 'Invalid email or password.';
-    case 'auth/too-many-requests':
-      return 'Too many failed attempts. Please try again later.';
-    case 'auth/network-request-failed':
-      return 'Network error. Please check your connection.';
-    default:
-      return 'An error occurred. Please try again.';
+const getAuthErrorMessage = (code) => {
+  switch (code) {
+    case 'auth/invalid-email':           return 'Invalid email address format.';
+    case 'auth/user-disabled':           return 'This account has been disabled.';
+    case 'auth/user-not-found':          return 'No account found with this email.';
+    case 'auth/wrong-password':          return 'Incorrect password. Please try again.';
+    case 'auth/invalid-credential':      return 'Invalid email or password.';
+    case 'auth/too-many-requests':       return 'Too many failed attempts. Please try again later.';
+    case 'auth/network-request-failed':  return 'Network error. Please check your connection.';
+    default:                             return 'An error occurred. Please try again.';
   }
 };

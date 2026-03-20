@@ -67,7 +67,7 @@ export default function ModernHomeScreen({ navigation }) {
 
         <ScrollView 
           style={[styles.content, { backgroundColor: theme.background }]}
-          contentContainerStyle={{ backgroundColor: 'transparent' }}
+          contentContainerStyle={{ backgroundColor: 'transparent', maxWidth: 1200, width: '100%', alignSelf: 'center' }}
           showsVerticalScrollIndicator={false}
         >
           {/* Verification Banner */}

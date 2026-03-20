@@ -14,7 +14,6 @@ export default function ModernSignupScreen({ navigation }) {
   const [isDark, setIsDark] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [studentId, setStudentId] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -24,7 +23,7 @@ export default function ModernSignupScreen({ navigation }) {
   const theme = isDark ? darkTheme : lightTheme;
 
   const handleSignup = async () => {
-    if (!name.trim() || !email.trim() || !studentId.trim() || !password.trim() || !confirmPassword.trim()) {
+    if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
       setError('Please fill in all fields.');
       return;
     }
@@ -52,7 +51,6 @@ export default function ModernSignupScreen({ navigation }) {
     try {
       await registerStudent(email.trim(), password, {
         fullName: name.trim(),
-        studentId: studentId.trim(),
       });
       
       navigation.replace('Login');
@@ -151,26 +149,9 @@ export default function ModernSignupScreen({ navigation }) {
                           placeholder="your.email@skcet.ac.in"
                           placeholderTextColor={theme.textTertiary}
                           value={email}
-                          onChangeText={(text) => {
-                            setEmail(text);
-                            setError('');
-                          }}
+                          onChangeText={(text) => { setEmail(text); setError(''); }}
                           keyboardType="email-address"
                           autoCapitalize="none"
-                        />
-                      </View>
-                    </View>
-
-                    <View style={styles.inputContainer}>
-                      <Text style={[styles.label, { color: theme.text }]}>Student ID</Text>
-                      <View style={[styles.input, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-                        <Ionicons name="card-outline" size={20} color={theme.textSecondary} />
-                        <TextInput
-                          style={[styles.textInput, { color: theme.text }]}
-                          placeholder="Enter your student ID"
-                          placeholderTextColor={theme.textTertiary}
-                          value={studentId}
-                          onChangeText={setStudentId}
                         />
                       </View>
                     </View>
@@ -294,9 +275,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     marginBottom: spacing.md,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    ...(Platform.OS === 'web'
+      ? { textShadow: '0px 2px 4px rgba(0,0,0,0.2)' }
+      : { textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 }
+    ),
   },
   heroSubtitle: {
     fontSize: 20,
@@ -355,11 +337,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: spacing.xl,
     marginBottom: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0px 8px 16px rgba(0,0,0,0.15)' }
+      : { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 8 }
+    ),
   },
   inputContainer: {
     marginBottom: spacing.lg,
@@ -388,11 +369,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     minHeight: 52,
     justifyContent: 'center',
-    shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0px 4px 8px rgba(59,130,246,0.3)' }
+      : { shadowColor: '#3B82F6', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }
+    ),
   },
   buttonText: {
     ...typography.bodyMedium,

@@ -1,44 +1,50 @@
-import { collection, doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from './firebaseConfig';
-import { sampleSyllabus } from '../data/sampleData';
 
-const USE_FIRESTORE = process.env.EXPO_PUBLIC_USE_FIRESTORE === 'true';
+const getSyllabusColor = (progress) => {
+  if (progress >= 75) return '#10B981';
+  if (progress >= 50) return '#F59E0B';
+  return '#EF4444';
+};
 
-export const subscribeToSyllabus = (studentId, onSuccess, onError) => {
-  if (!USE_FIRESTORE) {
-    // Development mode: Return sample data
-    setTimeout(() => onSuccess(sampleSyllabus), 100);
-    return () => {}; // No-op unsubscribe
+// Subscribes to centralized syllabus doc for the student's dept/year/semester
+export const subscribeToSyllabus = (userProfile, onSuccess, onError) => {
+  const { department, year, semester } = userProfile || {};
+
+  if (!department || !year || !semester) {
+    onSuccess([]);
+    return () => {};
   }
 
-  // Production mode: Real-time Firestore listener
-  const syllabusRef = doc(db, 'students', studentId, 'syllabus', 'current');
+  const ref = doc(db, 'syllabus', department, year, semester);
+  console.log(`📖 Syllabus path: syllabus/${department}/${year}/${semester}`);
 
-  const unsubscribe = onSnapshot(
-    syllabusRef,
+  return onSnapshot(
+    ref,
     (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        onSuccess(data.subjects || []);
-      } else {
+      if (!snapshot.exists()) {
+        console.warn('⚠️  No syllabus found at path');
         onSuccess([]);
+        return;
       }
+      const subjects = (snapshot.data().subjects || []).map((sub) => {
+        const progress = sub.totalTopics > 0
+          ? Math.round((sub.completedTopics / sub.totalTopics) * 100)
+          : 0;
+        return {
+          id: sub.subject,
+          subject: sub.subject,
+          totalTopics: sub.totalTopics,
+          completedTopics: sub.completedTopics,
+          progress,
+          color: getSyllabusColor(progress),
+        };
+      });
+      onSuccess(subjects);
     },
     (error) => {
       console.error('Syllabus listener error:', error);
       onError(error);
     }
   );
-
-  return unsubscribe;
-};
-
-export const getSyllabus = async (studentId) => {
-  if (!USE_FIRESTORE) {
-    return sampleSyllabus;
-  }
-
-  const syllabusRef = doc(db, 'students', studentId, 'syllabus', 'current');
-  const snapshot = await getDoc(syllabusRef);
-  return snapshot.exists() ? snapshot.data().subjects || [] : [];
 };

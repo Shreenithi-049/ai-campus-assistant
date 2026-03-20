@@ -27,7 +27,7 @@ export default function ModernProfileScreen({ navigation }) {
         reader.onload = async (event) => {
           const photoURL = event.target.result;
           try {
-            await updateDoc(doc(db, 'students', user.uid), { photoURL });
+            await updateDoc(doc(db, 'students', userProfile._docId), { photoURL });
             await refreshUserProfile();
           } catch (error) {
             console.error('Error uploading photo:', error);
@@ -93,6 +93,7 @@ export default function ModernProfileScreen({ navigation }) {
 
         <ScrollView 
           style={styles.content}
+          contentContainerStyle={{ maxWidth: 1200, width: '100%', alignSelf: 'center' }}
           showsVerticalScrollIndicator={false}
         >
           {/* Profile Card */}

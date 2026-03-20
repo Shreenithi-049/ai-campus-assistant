@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Linking, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn, SlideInRight } from 'react-native-reanimated';
@@ -13,6 +13,7 @@ import { getStudentAttendance, calculateOverallAttendance } from '../services/at
 export default function ModernAcademicScreen({ navigation }) {
   const { isDarkMode, toggleDarkMode, user, userProfile } = useAuth();
   const theme = isDarkMode ? darkTheme : lightTheme;
+  const [selectedFaculty, setSelectedFaculty] = useState(null);
   const [activeTab, setActiveTab] = useState('timetable');
   const [timetable, setTimetable] = useState([]);
   const [faculty, setFaculty] = useState([]);
@@ -22,10 +23,23 @@ export default function ModernAcademicScreen({ navigation }) {
   const [loadingAttendance, setLoadingAttendance] = useState(false);
 
   useEffect(() => {
+    const dept = userProfile?.department;
+    const yr   = userProfile?.year;
+
+    console.log('📚 Timetable fetch — Dept:', dept, '| Year:', yr);
+
+    if (!dept || !yr) {
+      console.warn('⚠️  Student profile missing department or year — skipping timetable fetch');
+      return;
+    }
+
     const unsubTimetable = subscribeToTimetable(
-      userProfile?.department || 'Computer Science',
-      userProfile?.year || '3rd Year',
-      setTimetable,
+      dept,
+      yr,
+      (data) => {
+        console.log('📅 Timetable data received:', data.length, 'entries');
+        setTimetable(data);
+      },
       (error) => console.error('Timetable error:', error)
     );
 
@@ -35,7 +49,7 @@ export default function ModernAcademicScreen({ navigation }) {
     );
 
     const unsubSyllabus = subscribeToSyllabus(
-      user?.uid,
+      userProfile,
       setSyllabus,
       (error) => console.error('Syllabus error:', error)
     );
@@ -55,7 +69,7 @@ export default function ModernAcademicScreen({ navigation }) {
 
   const loadAttendance = async () => {
     setLoadingAttendance(true);
-    const result = await getStudentAttendance(user.uid);
+    const result = await getStudentAttendance(userProfile);
     if (result.success) {
       setAttendance(result.data);
       const attendanceObj = result.data.reduce((acc, item) => {
@@ -80,36 +94,74 @@ export default function ModernAcademicScreen({ navigation }) {
     { id: 'attendance', label: 'Attendance', icon: 'checkmark-circle-outline' },
   ];
 
-  const renderTimetable = () => (
-    <View>
-      {timetable.map((item, index) => (
-        <Animated.View
-          key={item.id}
-          entering={SlideInRight.delay(index * 100)}
-        >
-          <View style={[styles.card, { backgroundColor: theme.surface }, shadows.md]}>
-            <View style={[styles.colorBar, { backgroundColor: item.color }]} />
-            <View style={styles.cardContent}>
-              <View style={styles.cardHeader}>
-                <Text style={[styles.cardTitle, { color: theme.text }]}>{item.subject}</Text>
-                <View style={[styles.badge, { backgroundColor: item.color + '20' }]}>
-                  <Text style={[styles.badgeText, { color: item.color }]}>{item.room}</Text>
+  const renderTimetable = () => {
+    if (!userProfile?.department || !userProfile?.year) {
+      return (
+        <View style={styles.centerContainer}>
+          <Ionicons name="person-circle-outline" size={64} color={theme.textSecondary} />
+          <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+            Complete your profile to view timetable
+          </Text>
+          <Text style={[styles.emptySubText, { color: theme.textSecondary }]}>
+            Department and year are required
+          </Text>
+        </View>
+      );
+    }
+
+    if (timetable.length === 0) {
+      return (
+        <View style={styles.centerContainer}>
+          <Ionicons name="calendar-outline" size={64} color={theme.textSecondary} />
+          <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No timetable available</Text>
+          <Text style={[styles.emptySubText, { color: theme.textSecondary }]}>
+            {userProfile.department} • {userProfile.year}
+          </Text>
+        </View>
+      );
+    }
+
+    // Group entries by day
+    const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const byDay = DAYS.reduce((acc, d) => {
+      const entries = timetable.filter(item => item.day === d);
+      if (entries.length > 0) acc[d] = entries;
+      return acc;
+    }, {});
+
+    return (
+      <View>
+        {Object.entries(byDay).map(([day, entries]) => (
+          <View key={day}>
+            <Text style={[styles.dayHeader, { color: theme.primary }]}>{day}</Text>
+            {entries.map((item, index) => (
+              <Animated.View key={item.id} entering={SlideInRight.delay(index * 80)}>
+                <View style={[styles.card, { backgroundColor: theme.surface }, shadows.md]}>
+                  <View style={[styles.colorBar, { backgroundColor: item.color }]} />
+                  <View style={styles.cardContent}>
+                    <View style={styles.cardHeader}>
+                      <Text style={[styles.cardTitle, { color: theme.text }]}>{item.subject}</Text>
+                      <View style={[styles.badge, { backgroundColor: item.color + '20' }]}>
+                        <Text style={[styles.badgeText, { color: item.color }]}>{item.room}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.cardRow}>
+                      <Ionicons name="time-outline" size={16} color={theme.textSecondary} />
+                      <Text style={[styles.cardText, { color: theme.textSecondary }]}>{item.time}</Text>
+                    </View>
+                    <View style={styles.cardRow}>
+                      <Ionicons name="person-outline" size={16} color={theme.textSecondary} />
+                      <Text style={[styles.cardText, { color: theme.textSecondary }]}>{item.professor}</Text>
+                    </View>
+                  </View>
                 </View>
-              </View>
-              <View style={styles.cardRow}>
-                <Ionicons name="time-outline" size={16} color={theme.textSecondary} />
-                <Text style={[styles.cardText, { color: theme.textSecondary }]}>{item.time}</Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Ionicons name="person-outline" size={16} color={theme.textSecondary} />
-                <Text style={[styles.cardText, { color: theme.textSecondary }]}>{item.professor}</Text>
-              </View>
-            </View>
+              </Animated.View>
+            ))}
           </View>
-        </Animated.View>
-      ))}
-    </View>
-  );
+        ))}
+      </View>
+    );
+  };
 
   const renderFaculty = () => (
     <View>
@@ -145,7 +197,10 @@ export default function ModernAcademicScreen({ navigation }) {
                   <Text style={[styles.detailText, { color: theme.textSecondary }]}>{item.hours}</Text>
                 </View>
               </View>
-              <TouchableOpacity style={[styles.contactButton, { backgroundColor: theme.primary }]}>
+              <TouchableOpacity
+                style={[styles.contactButton, { backgroundColor: theme.primary }]}
+                onPress={() => setSelectedFaculty(item)}
+              >
                 <Text style={styles.contactButtonText}>Contact</Text>
               </TouchableOpacity>
             </View>
@@ -155,44 +210,63 @@ export default function ModernAcademicScreen({ navigation }) {
     </View>
   );
 
-  const renderSyllabus = () => (
-    <View>
-      {syllabus.map((item, index) => (
-        <Animated.View
-          key={item.id}
-          entering={SlideInRight.delay(index * 100)}
-        >
-          <View style={[styles.card, { backgroundColor: theme.surface }, shadows.md]}>
-            <View style={styles.cardContent}>
-              <Text style={[styles.cardTitle, { color: theme.text }]}>{item.subject}</Text>
-              <View style={styles.progressContainer}>
-                <View style={styles.progressHeader}>
-                  <Text style={[styles.progressText, { color: theme.textSecondary }]}>
-                    {item.completed} of {item.topics} topics completed
-                  </Text>
-                  <Text style={[styles.progressPercent, { color: theme.primary }]}>
-                    {item.progress}%
-                  </Text>
-                </View>
-                <View style={[styles.progressBar, { backgroundColor: theme.border }]}>
-                  <View 
-                    style={[
-                      styles.progressFill, 
-                      { backgroundColor: theme.primary, width: `${item.progress}%` }
-                    ]} 
-                  />
+  const renderSyllabus = () => {
+    if (!userProfile?.department || !userProfile?.year || !userProfile?.semester) {
+      return (
+        <View style={styles.centerContainer}>
+          <Ionicons name="book-outline" size={64} color={theme.textSecondary} />
+          <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+            Complete your profile to view syllabus
+          </Text>
+          <Text style={[styles.emptySubText, { color: theme.textSecondary }]}>
+            Department, year and semester are required
+          </Text>
+        </View>
+      );
+    }
+
+    if (syllabus.length === 0) {
+      return (
+        <View style={styles.centerContainer}>
+          <Ionicons name="book-outline" size={64} color={theme.textSecondary} />
+          <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No syllabus available</Text>
+          <Text style={[styles.emptySubText, { color: theme.textSecondary }]}>
+            {userProfile.department} • {userProfile.year} • {userProfile.semester}
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View>
+        {syllabus.map((item, index) => (
+          <Animated.View key={item.id} entering={SlideInRight.delay(index * 100)}>
+            <View style={[styles.card, { backgroundColor: theme.surface }, shadows.md]}>
+              <View style={[styles.colorBar, { backgroundColor: item.color }]} />
+              <View style={styles.cardContent}>
+                <Text style={[styles.cardTitle, { color: theme.text }]}>{item.subject}</Text>
+                <View style={styles.progressContainer}>
+                  <View style={styles.progressHeader}>
+                    <Text style={[styles.progressText, { color: theme.textSecondary }]}>
+                      {item.completedTopics} / {item.totalTopics} topics completed
+                    </Text>
+                    <Text style={[styles.progressPercent, { color: item.color }]}>
+                      {item.progress}%
+                    </Text>
+                  </View>
+                  <View style={[styles.progressBar, { backgroundColor: theme.border }]}>
+                    <View
+                      style={[styles.progressFill, { backgroundColor: item.color, width: `${item.progress}%` }]}
+                    />
+                  </View>
                 </View>
               </View>
-              <TouchableOpacity style={[styles.viewButton, { borderColor: theme.primary }]}>
-                <Text style={[styles.viewButtonText, { color: theme.primary }]}>View Details</Text>
-                <Ionicons name="arrow-forward" size={16} color={theme.primary} />
-              </TouchableOpacity>
             </View>
-          </View>
-        </Animated.View>
-      ))}
-    </View>
-  );
+          </Animated.View>
+        ))}
+      </View>
+    );
+  };
 
   const renderAttendance = () => {
     if (loadingAttendance) {
@@ -272,6 +346,78 @@ export default function ModernAcademicScreen({ navigation }) {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {/* Faculty Contact Modal */}
+      <Modal
+        visible={!!selectedFaculty}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedFaculty(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setSelectedFaculty(null)}
+        >
+          <TouchableOpacity activeOpacity={1} style={[styles.modalCard, { backgroundColor: theme.surface }]}>
+            <View style={[styles.modalAvatar, { backgroundColor: theme.primary }]}>
+              <Text style={styles.avatarText}>{selectedFaculty?.name?.charAt(0)}</Text>
+            </View>
+            <Text style={[styles.modalName, { color: theme.text }]}>{selectedFaculty?.name}</Text>
+            <Text style={[styles.modalDept, { color: theme.textSecondary }]}>{selectedFaculty?.department}</Text>
+
+            <View style={[styles.modalDivider, { backgroundColor: theme.border }]} />
+
+            {selectedFaculty?.email ? (
+              <TouchableOpacity
+                style={styles.modalRow}
+                onPress={() => Linking.openURL(`mailto:${selectedFaculty.email}`)}
+              >
+                <View style={[styles.modalIconBox, { backgroundColor: theme.primary + '20' }]}>
+                  <Text style={styles.modalIcon}>✉️</Text>
+                </View>
+                <View style={styles.modalRowText}>
+                  <Text style={[styles.modalLabel, { color: theme.textSecondary }]}>Email</Text>
+                  <Text style={[styles.modalValue, { color: theme.primary }]}>{selectedFaculty.email}</Text>
+                </View>
+              </TouchableOpacity>
+            ) : null}
+
+            {selectedFaculty?.phone ? (
+              <TouchableOpacity
+                style={styles.modalRow}
+                onPress={() => Linking.openURL(`tel:${selectedFaculty.phone}`)}
+              >
+                <View style={[styles.modalIconBox, { backgroundColor: '#10B98120' }]}>
+                  <Text style={styles.modalIcon}>📞</Text>
+                </View>
+                <View style={styles.modalRowText}>
+                  <Text style={[styles.modalLabel, { color: theme.textSecondary }]}>Phone</Text>
+                  <Text style={[styles.modalValue, { color: '#10B981' }]}>{selectedFaculty.phone}</Text>
+                </View>
+              </TouchableOpacity>
+            ) : null}
+
+            {selectedFaculty?.office ? (
+              <View style={styles.modalRow}>
+                <View style={[styles.modalIconBox, { backgroundColor: '#F59E0B20' }]}>
+                  <Text style={styles.modalIcon}>📍</Text>
+                </View>
+                <View style={styles.modalRowText}>
+                  <Text style={[styles.modalLabel, { color: theme.textSecondary }]}>Office</Text>
+                  <Text style={[styles.modalValue, { color: theme.text }]}>{selectedFaculty.office}</Text>
+                </View>
+              </View>
+            ) : null}
+
+            <TouchableOpacity
+              style={[styles.modalCloseBtn, { backgroundColor: theme.primary }]}
+              onPress={() => setSelectedFaculty(null)}
+            >
+              <Text style={styles.modalCloseBtnText}>Close</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
       <LinearGradient
         colors={isDarkMode ? ['#0F172A', '#1E293B'] : ['#FFFFFF', '#F8FAFC']}
         style={styles.gradient}
@@ -319,6 +465,7 @@ export default function ModernAcademicScreen({ navigation }) {
         {/* Content */}
         <ScrollView 
           style={styles.content}
+          contentContainerStyle={{ maxWidth: 1200, width: '100%', alignSelf: 'center', paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
         >
           <Animated.View entering={FadeIn} key={activeTab}>
@@ -501,6 +648,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: spacing.xxl * 2,
   },
+  dayHeader: {
+    ...typography.h4,
+    fontWeight: '700',
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    paddingLeft: spacing.xs,
+  },
   loadingText: {
     ...typography.body,
     marginTop: spacing.md,
@@ -508,6 +662,11 @@ const styles = StyleSheet.create({
   emptyText: {
     ...typography.body,
     marginTop: spacing.md,
+  },
+  emptySubText: {
+    ...typography.small,
+    marginTop: spacing.xs,
+    opacity: 0.7,
   },
   overallTitle: {
     ...typography.h4,
@@ -535,5 +694,83 @@ const styles = StyleSheet.create({
     ...typography.h4,
     fontWeight: 'bold',
     minWidth: 50,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    alignItems: 'center',
+    ...shadows.lg,
+  },
+  modalAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  modalName: {
+    ...typography.h3,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  modalDept: {
+    ...typography.body,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  modalDivider: {
+    width: '100%',
+    height: 1,
+    marginBottom: spacing.md,
+  },
+  modalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: spacing.md,
+    gap: spacing.md,
+  },
+  modalIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: borderRadius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalIcon: {
+    fontSize: 20,
+  },
+  modalRowText: {
+    flex: 1,
+  },
+  modalLabel: {
+    ...typography.caption,
+    marginBottom: 2,
+  },
+  modalValue: {
+    ...typography.bodyMedium,
+    fontWeight: '600',
+  },
+  modalCloseBtn: {
+    marginTop: spacing.sm,
+    width: '100%',
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+  },
+  modalCloseBtnText: {
+    ...typography.bodyMedium,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
 });

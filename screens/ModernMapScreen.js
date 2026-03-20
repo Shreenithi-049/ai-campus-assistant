@@ -1,367 +1,795 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, {
+  useState, useRef, useEffect, useCallback,
+} from 'react';
+import {
+  View, Text, StyleSheet, TextInput, TouchableOpacity,
+  FlatList, Animated, PanResponder, Dimensions, Platform,
+  ScrollView, StatusBar,
+} from 'react-native';
+import Svg, {
+  Rect, Path, Circle, G, Text as SvgText,
+} from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated';
-import { lightTheme, darkTheme, spacing, typography, borderRadius, shadows } from '../constants/modernTheme';
+import { buildings, nodes, USER_NODE } from '../utils/graph';
+import {
+  dijkstra, pathToSvgD, pathDistance, buildRouteSegments,
+} from '../utils/dijkstra';
 import { useAuth } from '../contexts/AuthContext';
+import { getTheme, spacing, typography, borderRadius, shadows } from '../constants/modernTheme';
 
-export default function ModernMapScreen({ navigation }) {
-  const { isDarkMode, toggleDarkMode } = useAuth();
-  const theme = isDarkMode ? darkTheme : lightTheme;
-  const [selectedBuilding, setSelectedBuilding] = useState(null);
-  const [showModal, setShowModal] = useState(false);
+// ─── Constants ───────────────────────────────────────────────────────────────
+const { width: SW, height: SH } = Dimensions.get('window');
+const VB_W = 700;
+const VB_H = 620;
+const SVG_TO_M = 0.5;
+const STEPS_PER_M = 1.3;
+const NAV_DURATION = 8000; // ms for full route animation
 
-  const buildings = [
-    { id: 1, name: 'Main Library', code: 'LIB', x: 30, y: 40, color: '#3B82F6', description: 'Central library with study rooms' },
-    { id: 2, name: 'Engineering Block', code: 'ENG', x: 60, y: 30, color: '#10B981', description: 'Computer labs and lecture halls' },
-    { id: 3, name: 'Science Building', code: 'SCI', x: 50, y: 60, color: '#8B5CF6', description: 'Research labs and classrooms' },
-    { id: 4, name: 'Student Center', code: 'SC', x: 70, y: 50, color: '#F59E0B', description: 'Cafeteria and recreation' },
-    { id: 5, name: 'Admin Block', code: 'ADM', x: 40, y: 70, color: '#EF4444', description: 'Administrative offices' },
-  ];
+// ─── Road visual paths ────────────────────────────────────────────────────────
+const ROADS = [
+  'M 30 220 L 670 220',
+  'M 300 100 L 300 590',
+  'M 100 220 L 100 590',
+  'M 135 100 L 220 220',
+  'M 300 220 Q 430 265 520 220',
+  'M 520 220 L 590 180 L 590 320',
+  'M 300 390 L 430 390 L 430 310',
+  'M 370 100 L 370 220',
+];
 
-  const handleMarkerPress = (building) => {
-    setSelectedBuilding(building);
-    setShowModal(true);
+// ─── Turn-by-turn label helper ────────────────────────────────────────────────
+function nodeLabel(key) {
+  return key
+    .replace(/^j/, '')
+    .replace(/([A-Z])/g, ' $1')
+    .trim() || key;
+}
+
+function getTurnInstructions(path) {
+  if (!path || path.length < 2) return [];
+  const steps = [];
+  steps.push({ icon: 'radio-button-on', color: '#2563EB', text: `Start at ${nodeLabel(path[0])}` });
+  for (let i = 1; i < path.length - 1; i++) {
+    const prev = nodes[path[i - 1]];
+    const curr = nodes[path[i]];
+    const next = nodes[path[i + 1]];
+    const d1x = curr.x - prev.x; const d1y = curr.y - prev.y;
+    const d2x = next.x - curr.x; const d2y = next.y - curr.y;
+    const cross = d1x * d2y - d1y * d2x;
+    let turn = 'Continue straight';
+    let icon = 'arrow-up-outline';
+    if (cross > 500)       { turn = 'Turn right'; icon = 'arrow-forward-outline'; }
+    else if (cross < -500) { turn = 'Turn left';  icon = 'arrow-back-outline'; }
+    steps.push({ icon, color: '#374151', text: `${turn} at ${nodeLabel(path[i])}` });
+  }
+  steps.push({ icon: 'flag', color: '#EF4444', text: `Arrive at destination` });
+  return steps;
+}
+
+// ─── Animated dot position interpolated over segments ────────────────────────
+function interpolateDot(segments, progress) {
+  if (!segments.length) return { x: 0, y: 0 };
+  const total = segments[segments.length - 1].cumLen + segments[segments.length - 1].len;
+  const target = progress * total;
+  for (const seg of segments) {
+    const segEnd = seg.cumLen + seg.len;
+    if (target <= segEnd) {
+      const t = seg.len === 0 ? 0 : (target - seg.cumLen) / seg.len;
+      return {
+        x: seg.x1 + t * (seg.x2 - seg.x1),
+        y: seg.y1 + t * (seg.y2 - seg.y1),
+      };
+    }
+  }
+  const last = segments[segments.length - 1];
+  return { x: last.x2, y: last.y2 };
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+export default function ModernMapScreen() {
+  const { isDarkMode } = useAuth();
+  const theme = getTheme(isDarkMode);
+
+  // Search state
+  const [startQuery, setStartQuery]       = useState('My Location');
+  const [destQuery, setDestQuery]         = useState('');
+  const [startBuilding, setStartBuilding] = useState(null); // null = user location
+  const [destBuilding, setDestBuilding]   = useState(null);
+  const [startSuggestions, setStartSuggestions] = useState([]);
+  const [destSuggestions, setDestSuggestions]   = useState([]);
+  const [activeInput, setActiveInput]     = useState(null); // 'start' | 'dest'
+  const [panelOpen, setPanelOpen]         = useState(false);
+
+  // Route state
+  const [route, setRoute]       = useState(null); // { path, svgD, dist, segments }
+  const [navMode, setNavMode]   = useState(false);
+  const [navDone, setNavDone]   = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [dotPos, setDotPos]     = useState(null);
+  const [turns, setTurns]       = useState([]);
+
+  // Animation refs
+  const navProgress   = useRef(new Animated.Value(0)).current;
+  const navAnim       = useRef(null);
+  const pulseAnim     = useRef(new Animated.Value(1)).current;
+  const sheetAnim     = useRef(new Animated.Value(300)).current;
+  const panelAnim     = useRef(new Animated.Value(-300)).current;
+
+  // Pan/zoom refs
+  const scaleRef  = useRef(1);
+  const txRef     = useRef(0);
+  const tyRef     = useRef(0);
+  const lastScale = useRef(1);
+  const lastTX    = useRef(0);
+  const lastTY    = useRef(0);
+  const lastPinch = useRef(null);
+  const transformAnim = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const scaleAnimVal  = useRef(new Animated.Value(1)).current;
+
+  const applyTransform = useCallback(() => {
+    transformAnim.setValue({ x: txRef.current, y: tyRef.current });
+    scaleAnimVal.setValue(scaleRef.current);
+  }, []);
+
+  // ── Pan responder ──────────────────────────────────────────────────────────
+  const panResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder:  () => true,
+    onPanResponderGrant: () => {
+      lastTX.current    = txRef.current;
+      lastTY.current    = tyRef.current;
+      lastScale.current = scaleRef.current;
+      lastPinch.current = null;
+    },
+    onPanResponderMove: (_, gs) => {
+      if (gs.numberActiveTouches === 2) {
+        const t = gs._nativeEvent?.touches;
+        if (t && t.length === 2) {
+          const d = Math.hypot(t[0].pageX - t[1].pageX, t[0].pageY - t[1].pageY);
+          if (lastPinch.current !== null) {
+            scaleRef.current = Math.min(4, Math.max(0.4, lastScale.current * (d / lastPinch.current)));
+          }
+          lastPinch.current  = d;
+          lastScale.current  = scaleRef.current;
+        }
+      } else {
+        txRef.current = lastTX.current + gs.dx;
+        tyRef.current = lastTY.current + gs.dy;
+      }
+      applyTransform();
+    },
+    onPanResponderRelease: () => { lastPinch.current = null; },
+  })).current;
+
+  // ── Pulse animation ────────────────────────────────────────────────────────
+  useEffect(() => {
+    Animated.loop(Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 2.2, duration: 1000, useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 1,   duration: 1000, useNativeDriver: true }),
+    ])).start();
+  }, []);
+
+  // ── Sheet animation ────────────────────────────────────────────────────────
+  useEffect(() => {
+    Animated.spring(sheetAnim, {
+      toValue: route ? 0 : 300,
+      useNativeDriver: true,
+      tension: 65, friction: 11,
+    }).start();
+  }, [route]);
+
+  // ── Panel animation ────────────────────────────────────────────────────────
+  useEffect(() => {
+    Animated.spring(panelAnim, {
+      toValue: panelOpen ? 0 : -300,
+      useNativeDriver: true,
+      tension: 65, friction: 11,
+    }).start();
+  }, [panelOpen]);
+
+  // ── Nav dot interpolation listener ────────────────────────────────────────
+  useEffect(() => {
+    const id = navProgress.addListener(({ value }) => {
+      if (!route?.segments) return;
+      setDotPos(interpolateDot(route.segments, value));
+      // Update current step
+      const total = route.segments[route.segments.length - 1]?.cumLen +
+                    route.segments[route.segments.length - 1]?.len || 1;
+      const travelled = value * total;
+      let stepIdx = 0;
+      for (let i = 0; i < route.segments.length; i++) {
+        if (travelled >= route.segments[i].cumLen) stepIdx = i;
+      }
+      setCurrentStep(Math.min(stepIdx, turns.length - 1));
+    });
+    return () => navProgress.removeListener(id);
+  }, [route, turns]);
+
+  // ── Search helpers ─────────────────────────────────────────────────────────
+  const filterBuildings = (text) =>
+    text.trim()
+      ? buildings.filter(b => b.name.toLowerCase().includes(text.toLowerCase()))
+      : buildings.slice(0, 6);
+
+  const handleStartChange = (text) => {
+    setStartQuery(text);
+    setStartSuggestions(filterBuildings(text));
   };
 
-  const handleGetDirections = () => {
-    setShowModal(false);
-    navigation.navigate('Chat', { 
-      query: `How do I get to ${selectedBuilding?.name}?` 
+  const handleDestChange = (text) => {
+    setDestQuery(text);
+    setDestSuggestions(filterBuildings(text));
+  };
+
+  const selectStart = (b) => {
+    setStartBuilding(b);
+    setStartQuery(b.name);
+    setStartSuggestions([]);
+    setActiveInput(null);
+  };
+
+  const selectDest = (b) => {
+    setDestBuilding(b);
+    setDestQuery(b.name);
+    setDestSuggestions([]);
+    setActiveInput(null);
+  };
+
+  // ── Routing ────────────────────────────────────────────────────────────────
+  const computeRoute = useCallback(() => {
+    const fromNode = startBuilding ? startBuilding.node : USER_NODE;
+    const toNode   = destBuilding?.node;
+    if (!toNode) return;
+    const path = dijkstra(fromNode, toNode);
+    if (!path.length) return;
+    const svgD     = pathToSvgD(path);
+    const dist     = pathDistance(path);
+    const segments = buildRouteSegments(path);
+    const turnList = getTurnInstructions(path);
+    setRoute({ path, svgD, dist, segments });
+    setTurns(turnList);
+    setNavMode(false);
+    setNavDone(false);
+    setCurrentStep(0);
+    navProgress.setValue(0);
+    setDotPos(segments.length ? { x: segments[0].x1, y: segments[0].y1 } : null);
+    setPanelOpen(false);
+  }, [startBuilding, destBuilding]);
+
+  const clearAll = () => {
+    setRoute(null);
+    setDestBuilding(null);
+    setStartBuilding(null);
+    setStartQuery('My Location');
+    setDestQuery('');
+    setNavMode(false);
+    setNavDone(false);
+    setDotPos(null);
+    navProgress.setValue(0);
+    if (navAnim.current) navAnim.current.stop();
+  };
+
+  // ── Navigation animation ───────────────────────────────────────────────────
+  const startNavigation = () => {
+    if (!route) return;
+    setNavMode(true);
+    setNavDone(false);
+    navProgress.setValue(0);
+    navAnim.current = Animated.timing(navProgress, {
+      toValue: 1,
+      duration: NAV_DURATION,
+      useNativeDriver: false,
+    });
+    navAnim.current.start(({ finished }) => {
+      if (finished) { setNavDone(true); setNavMode(false); }
     });
   };
 
+  const stopNavigation = () => {
+    if (navAnim.current) navAnim.current.stop();
+    setNavMode(false);
+    navProgress.setValue(0);
+    setDotPos(route?.segments?.length
+      ? { x: route.segments[0].x1, y: route.segments[0].y1 }
+      : null);
+    setCurrentStep(0);
+  };
+
+  // ── Tap building on map ────────────────────────────────────────────────────
+  const tapBuilding = (b) => {
+    setDestBuilding(b);
+    setDestQuery(b.name);
+    const fromNode = startBuilding ? startBuilding.node : USER_NODE;
+    const path = dijkstra(fromNode, b.node);
+    if (!path.length) return;
+    const svgD     = pathToSvgD(path);
+    const dist     = pathDistance(path);
+    const segments = buildRouteSegments(path);
+    const turnList = getTurnInstructions(path);
+    setRoute({ path, svgD, dist, segments });
+    setTurns(turnList);
+    setNavMode(false);
+    setNavDone(false);
+    setCurrentStep(0);
+    navProgress.setValue(0);
+    setDotPos(segments.length ? { x: segments[0].x1, y: segments[0].y1 } : null);
+  };
+
+  const userPos = startBuilding ? nodes[startBuilding.node] : nodes[USER_NODE];
+  const destPos = destBuilding  ? nodes[destBuilding.node]  : null;
+  const activeDot = navMode && dotPos ? dotPos : userPos;
+
+  // Web layout max width constraints
+  const isWebWide = Platform.OS === 'web' && SW > 768;
+  const panelMaxWidth = isWebWide ? 400 : '100%';
+  const panelAlign = isWebWide ? 'flex-start' : 'stretch';
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <LinearGradient
-        colors={isDarkMode ? ['#0F172A', '#1E293B'] : ['#FFFFFF', '#F8FAFC']}
-        style={styles.gradient}
-      >
-        {/* Header */}
-        <View style={[styles.header, { backgroundColor: theme.surface }, shadows.sm]}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color={theme.text} />
+    <View style={[s.root, { backgroundColor: theme.backgroundSecondary }]}>
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+
+      {/* ── Floating search bar (collapsed) ── */}
+      {!panelOpen && (
+        <View style={[s.searchBar, { maxWidth: panelMaxWidth, alignSelf: panelAlign }]}>
+          <TouchableOpacity style={[s.searchBarInner, { backgroundColor: theme.surface }]} onPress={() => setPanelOpen(true)}>
+            <Ionicons name="search" size={18} color={theme.textTertiary} />
+            <Text style={[s.searchBarText, { color: theme.text }]} numberOfLines={1}>
+              {destQuery || 'Where to?'}
+            </Text>
+            {destQuery ? (
+              <TouchableOpacity onPress={clearAll}>
+                <Ionicons name="close-circle" size={18} color={theme.textTertiary} />
+              </TouchableOpacity>
+            ) : (
+              <Ionicons name="chevron-down" size={16} color={theme.textTertiary} />
+            )}
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>Campus Map</Text>
-          <TouchableOpacity onPress={toggleDarkMode}>
-            <Ionicons name={isDarkMode ? 'sunny' : 'moon'} size={24} color={theme.text} />
+        </View>
+      )}
+
+      {/* ── Input panel (expanded) ── */}
+      <Animated.View style={[s.inputPanel, { transform: [{ translateY: panelAnim }], backgroundColor: theme.surface, maxWidth: panelMaxWidth, alignSelf: panelAlign }]}>
+        <View style={s.panelHeader}>
+          <TouchableOpacity onPress={() => setPanelOpen(false)} style={s.panelBack}>
+            <Ionicons name="arrow-back" size={20} color={theme.text} />
+          </TouchableOpacity>
+          <Text style={[s.panelTitle, { color: theme.text }]}>Get Directions</Text>
+        </View>
+
+        {/* Start input */}
+        <View style={[s.inputRow, { backgroundColor: theme.hoverBackground }]}>
+          <View style={[s.inputDot, { backgroundColor: theme.info }]} />
+          <TextInput
+            style={[s.inputField, { color: theme.text }]}
+            placeholder="Starting point"
+            placeholderTextColor={theme.textTertiary}
+            value={startQuery}
+            onChangeText={handleStartChange}
+            onFocus={() => { setActiveInput('start'); setStartSuggestions(filterBuildings(startQuery)); }}
+          />
+          {startBuilding && (
+            <TouchableOpacity onPress={() => { setStartBuilding(null); setStartQuery('My Location'); setStartSuggestions([]); }}>
+              <Ionicons name="close-circle" size={16} color={theme.textTertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Start suggestions */}
+        {activeInput === 'start' && startSuggestions.length > 0 && (
+          <View style={[s.dropdown, { backgroundColor: theme.surface }]}>
+            <FlatList
+              data={startSuggestions}
+              keyExtractor={(_, i) => `s${i}`}
+              keyboardShouldPersistTaps="handled"
+              style={{ maxHeight: 160 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={[s.dropItem, { borderBottomColor: theme.border }]} onPress={() => selectStart(item)}>
+                  <Ionicons name="business-outline" size={14} color={theme.info} style={{ marginRight: 8 }} />
+                  <Text style={[s.dropText, { color: theme.text }]}>{item.name}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        )}
+
+        {/* Divider */}
+        <View style={[s.inputDivider, { backgroundColor: theme.border }]} />
+
+        {/* Destination input */}
+        <View style={[s.inputRow, { backgroundColor: theme.hoverBackground }]}>
+          <View style={[s.inputDot, { backgroundColor: theme.error }]} />
+          <TextInput
+            style={[s.inputField, { color: theme.text }]}
+            placeholder="Choose destination"
+            placeholderTextColor={theme.textTertiary}
+            value={destQuery}
+            onChangeText={handleDestChange}
+            onFocus={() => { setActiveInput('dest'); setDestSuggestions(filterBuildings(destQuery)); }}
+          />
+          {destBuilding && (
+            <TouchableOpacity onPress={() => { setDestBuilding(null); setDestQuery(''); setDestSuggestions([]); }}>
+              <Ionicons name="close-circle" size={16} color={theme.textTertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Dest suggestions */}
+        {activeInput === 'dest' && destSuggestions.length > 0 && (
+          <View style={[s.dropdown, { backgroundColor: theme.surface }]}>
+            <FlatList
+              data={destSuggestions}
+              keyExtractor={(_, i) => `d${i}`}
+              keyboardShouldPersistTaps="handled"
+              style={{ maxHeight: 160 }}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={[s.dropItem, { borderBottomColor: theme.border }]} onPress={() => selectDest(item)}>
+                  <Ionicons name="location-outline" size={14} color={theme.error} style={{ marginRight: 8 }} />
+                  <Text style={[s.dropText, { color: theme.text }]}>{item.name}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        )}
+
+        {/* Get Directions button */}
+        <TouchableOpacity
+          style={[s.dirBtn, !destBuilding && s.dirBtnDisabled, { backgroundColor: destBuilding ? theme.primary : theme.primaryLight }]}
+          onPress={computeRoute}
+          disabled={!destBuilding}
+        >
+          <Ionicons name="navigate" size={16} color="#fff" style={{ marginRight: 6 }} />
+          <Text style={s.dirBtnText}>Get Directions</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* ── Map ── */}
+      <View style={[s.map, { backgroundColor: theme.backgroundSecondary }]} {...panResponder.panHandlers}>
+        <Animated.View style={{
+          flex: 1,
+          transform: [
+            { translateX: transformAnim.x },
+            { translateY: transformAnim.y },
+            { scale: scaleAnimVal },
+          ],
+        }}>
+          <Svg
+            width={SW}
+            height={SH}
+            viewBox={`0 0 ${VB_W} ${VB_H}`}
+            preserveAspectRatio="xMidYMid meet"
+          >
+            {/* Background */}
+            <Rect x="0" y="0" width={VB_W} height={VB_H} fill={isDarkMode ? '#020617' : '#E8F0E9'} />
+
+            {/* Roads — outer */}
+            {ROADS.map((d, i) => (
+              <Path key={`ro${i}`} d={d} stroke={isDarkMode ? '#1E293B' : '#C8D5C8'} strokeWidth="24"
+                strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            ))}
+            {/* Roads — surface */}
+            {ROADS.map((d, i) => (
+              <Path key={`rs${i}`} d={d} stroke={isDarkMode ? '#0F172A' : '#FFFFFF'} strokeWidth="14"
+                strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            ))}
+            {/* Roads — centre dash */}
+            {ROADS.map((d, i) => (
+              <Path key={`rd${i}`} d={d} stroke={theme.border} strokeWidth="2"
+                strokeLinecap="round" strokeDasharray="12 10" fill="none" />
+            ))}
+
+            {/* Route glow */}
+            {route?.svgD && (
+              <Path d={route.svgD} stroke={theme.info} strokeWidth="20"
+                strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.45" />
+            )}
+            {/* Route line */}
+            {route?.svgD && (
+              <Path d={route.svgD} stroke={theme.primary} strokeWidth="7"
+                strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            )}
+
+            {/* Entrance label */}
+            <Rect x="80" y="72" width="110" height="40" rx="10" fill={theme.textTertiary} />
+            <SvgText x="135" y="97" fontSize="10" fontWeight="bold" fill={theme.surface} textAnchor="middle">ENTRANCE</SvgText>
+
+            {/* Buildings */}
+            {buildings.map((b, i) => {
+              const isDest  = destBuilding?.name === b.name;
+              const isStart = startBuilding?.name === b.name;
+              return (
+                <G key={i} onPress={() => tapBuilding(b)}>
+                  <Rect x={b.x+3} y={b.y+3} width={b.w} height={b.h} rx="13" fill="rgba(0,0,0,0.15)" />
+                  <Rect
+                    x={b.x} y={b.y} width={b.w} height={b.h} rx="13"
+                    fill={isDest ? theme.primary : isStart ? theme.success : isDarkMode ? '#1E293B' : b.color}
+                    stroke={isDest || isStart ? theme.surface : isDarkMode ? theme.border : 'none'}
+                    strokeWidth={isDest || isStart ? 2.5 : isDarkMode ? 1 : 0}
+                  />
+                  <SvgText
+                    x={b.x + b.w / 2} y={b.y + b.h / 2 + 4}
+                    fontSize={b.w > 110 ? 10 : 8} fontWeight="bold"
+                    fill={isDest || isStart ? theme.surface : theme.text}
+                    textAnchor="middle"
+                  >{b.name}</SvgText>
+                </G>
+              );
+            })}
+
+            {/* User / start location pulse ring */}
+            <Circle cx={userPos.x} cy={userPos.y} r="18" fill={theme.primary} opacity="0.15" />
+            <Circle cx={userPos.x} cy={userPos.y} r="12" fill={theme.surface} />
+            <Circle cx={userPos.x} cy={userPos.y} r="8"  fill={theme.primary} />
+            <Circle cx={userPos.x} cy={userPos.y} r="3"  fill={theme.surface} />
+
+            {/* Destination pin */}
+            {destPos && (
+              <G>
+                <Circle cx={destPos.x} cy={destPos.y} r="13" fill={theme.error} />
+                <Circle cx={destPos.x} cy={destPos.y} r="5"  fill={theme.surface} />
+              </G>
+            )}
+
+            {/* Animated navigation dot */}
+            {navMode && dotPos && (
+              <G>
+                <Circle cx={dotPos.x} cy={dotPos.y} r="16" fill={theme.info} opacity="0.25" />
+                <Circle cx={dotPos.x} cy={dotPos.y} r="11" fill={theme.surface} />
+                <Circle cx={dotPos.x} cy={dotPos.y} r="7"  fill={theme.primary} />
+                <Circle cx={dotPos.x} cy={dotPos.y} r="3"  fill={theme.surface} />
+              </G>
+            )}
+          </Svg>
+        </Animated.View>
+
+        {/* Zoom controls */}
+        <View style={[s.zoomBox, { backgroundColor: theme.surface }]}>
+          <TouchableOpacity style={s.zoomBtn} onPress={() => { scaleRef.current = Math.min(4, scaleRef.current + 0.35); applyTransform(); }}>
+            <Ionicons name="add" size={20} color={theme.text} />
+          </TouchableOpacity>
+          <View style={[s.zoomLine, { backgroundColor: theme.border }]} />
+          <TouchableOpacity style={s.zoomBtn} onPress={() => { scaleRef.current = Math.max(0.4, scaleRef.current - 0.35); applyTransform(); }}>
+            <Ionicons name="remove" size={20} color={theme.text} />
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.content}>
-          {/* Map Container */}
-          <Animated.View 
-            entering={FadeIn}
-            style={[styles.mapContainer, { backgroundColor: theme.surface }, shadows.lg]}
-          >
-            <View style={styles.mapCanvas}>
-              {/* Campus paths */}
-              <View style={[styles.path, styles.pathHorizontal, { backgroundColor: theme.border }]} />
-              <View style={[styles.path, styles.pathVertical, { backgroundColor: theme.border }]} />
+        {/* Re-center */}
+        <TouchableOpacity style={[s.recenterBtn, { backgroundColor: theme.surface }]} onPress={() => {
+          txRef.current = 0; tyRef.current = 0; scaleRef.current = 1; applyTransform();
+        }}>
+          <Ionicons name="locate" size={20} color={theme.primary} />
+        </TouchableOpacity>
+      </View>
 
-              {/* Building markers */}
-              {buildings.map((building, index) => (
-                <Animated.View
-                  key={building.id}
-                  entering={FadeIn.delay(index * 100)}
-                  style={[
-                    styles.marker,
-                    { 
-                      left: `${building.x}%`, 
-                      top: `${building.y}%`,
-                    }
-                  ]}
-                >
-                  <TouchableOpacity
-                    style={[
-                      styles.markerButton,
-                      { backgroundColor: building.color },
-                      shadows.md
-                    ]}
-                    onPress={() => handleMarkerPress(building)}
-                  >
-                    <Text style={styles.markerText}>{building.code}</Text>
-                  </TouchableOpacity>
-                  <View style={[styles.markerPin, { backgroundColor: building.color }]} />
-                </Animated.View>
-              ))}
+      {/* ── Bottom Sheet ── */}
+      <Animated.View style={[s.sheet, { transform: [{ translateY: sheetAnim }], backgroundColor: theme.surface, maxWidth: panelMaxWidth, alignSelf: panelAlign }]}>
+        {route && destBuilding && (
+          <>
+            <View style={[s.sheetHandle, { backgroundColor: theme.border }]} />
 
-              {/* Current location */}
-              <View style={[styles.currentLocation, { left: '45%', top: '45%' }]}>
-                <View style={[styles.currentDot, { backgroundColor: theme.primary }]}>
-                  <View style={styles.currentPulse} />
-                </View>
+            {/* Header row */}
+            <View style={s.sheetHeader}>
+              <View style={[s.sheetIcon, { backgroundColor: theme.primary }]}>
+                <Ionicons name="navigate" size={20} color="#fff" />
               </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={[s.sheetTitle, { color: theme.text }]}>{destBuilding.name}</Text>
+                <Text style={[s.sheetMeta, { color: theme.textSecondary }]}>
+                  {Math.round(route.dist * SVG_TO_M)} m ·{' '}
+                  {Math.round(route.dist * SVG_TO_M * STEPS_PER_M)} steps ·{' '}
+                  ~{Math.ceil(route.dist * SVG_TO_M / 80)} min walk
+                </Text>
+              </View>
+              <TouchableOpacity onPress={clearAll} style={{ padding: 6 }}>
+                <Ionicons name="close" size={20} color={theme.textTertiary} />
+              </TouchableOpacity>
             </View>
-          </Animated.View>
 
-          {/* Buildings List */}
-          <View style={styles.buildingsList}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Campus Buildings</Text>
-            {buildings.map((building, index) => (
-              <Animated.View
-                key={building.id}
-                entering={SlideInDown.delay(300 + index * 100)}
-              >
-                <TouchableOpacity
-                  style={[styles.buildingCard, { backgroundColor: theme.surface }, shadows.sm]}
-                  onPress={() => handleMarkerPress(building)}
-                >
-                  <View style={[styles.buildingIcon, { backgroundColor: building.color + '20' }]}>
-                    <Ionicons name="business" size={24} color={building.color} />
-                  </View>
-                  <View style={styles.buildingInfo}>
-                    <Text style={[styles.buildingName, { color: theme.text }]}>
-                      {building.name}
-                    </Text>
-                    <Text style={[styles.buildingDesc, { color: theme.textSecondary }]}>
-                      {building.description}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
-          </View>
-        </ScrollView>
+            {/* Progress bar during navigation */}
+            {navMode && (
+              <View style={[s.progressTrack, { backgroundColor: theme.border }]}>
+                <Animated.View style={[s.progressFill, {
+                  width: navProgress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+                  backgroundColor: theme.primary
+                }]} />
+              </View>
+            )}
 
-        {/* Building Info Modal */}
-        <Modal
-          visible={showModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <Animated.View 
-              entering={SlideInDown}
-              style={[styles.modalContent, { backgroundColor: theme.surface }]}
-            >
-              <View style={styles.modalHeader}>
-                <View style={[
-                  styles.modalIcon,
-                  { backgroundColor: selectedBuilding?.color + '20' }
-                ]}>
-                  <Ionicons name="business" size={32} color={selectedBuilding?.color} />
+            {/* Turn-by-turn steps */}
+            <ScrollView style={s.turnScroll} showsVerticalScrollIndicator={false}>
+              {turns.map((t, i) => (
+                <View key={i} style={[s.turnRow, navMode && i === currentStep && { backgroundColor: theme.activeBackground }]}>
+                  <Ionicons name={t.icon} size={14} color={navMode && i === currentStep ? theme.primary : t.color} style={{ marginRight: 8 }} />
+                  <Text style={[s.turnText, { color: theme.textSecondary }, navMode && i === currentStep && { color: theme.primary, fontWeight: '600' }]}>
+                    {t.text}
+                  </Text>
                 </View>
-                <TouchableOpacity 
-                  style={styles.closeButton}
-                  onPress={() => setShowModal(false)}
-                >
-                  <Ionicons name="close" size={24} color={theme.text} />
-                </TouchableOpacity>
-              </View>
+              ))}
+            </ScrollView>
 
-              <Text style={[styles.modalTitle, { color: theme.text }]}>
-                {selectedBuilding?.name}
-              </Text>
-              <Text style={[styles.modalCode, { color: theme.textSecondary }]}>
-                Building Code: {selectedBuilding?.code}
-              </Text>
-              <Text style={[styles.modalDesc, { color: theme.textSecondary }]}>
-                {selectedBuilding?.description}
-              </Text>
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={[styles.actionButton, { backgroundColor: theme.primary }, shadows.md]}
-                  onPress={handleGetDirections}
-                >
-                  <Ionicons name="navigate" size={20} color="#FFFFFF" />
-                  <Text style={styles.actionButtonText}>Get Directions</Text>
+            {/* Action buttons */}
+            <View style={s.btnRow}>
+              {!navMode && !navDone && (
+                <TouchableOpacity style={[s.startBtn, { backgroundColor: theme.primary }]} onPress={startNavigation}>
+                  <Ionicons name="play" size={16} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={s.startBtnText}>Start Navigation</Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.actionButton, { backgroundColor: theme.accent }, shadows.md]}
-                  onPress={() => {
-                    setShowModal(false);
-                    navigation.navigate('Chat', { 
-                      query: `Tell me about ${selectedBuilding?.name}` 
-                    });
-                  }}
-                >
-                  <Ionicons name="information-circle" size={20} color="#FFFFFF" />
-                  <Text style={styles.actionButtonText}>Ask Assistant</Text>
+              )}
+              {navMode && (
+                <TouchableOpacity style={[s.stopBtn, { backgroundColor: theme.error }]} onPress={stopNavigation}>
+                  <Ionicons name="stop" size={16} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={s.startBtnText}>Stop</Text>
                 </TouchableOpacity>
-              </View>
-            </Animated.View>
-          </View>
-        </Modal>
-      </LinearGradient>
+              )}
+              {navDone && (
+                <View style={[s.arrivedBanner, { backgroundColor: theme.success + '20' }]}>
+                  <Ionicons name="checkmark-circle" size={18} color={theme.success} style={{ marginRight: 6 }} />
+                  <Text style={[s.arrivedText, { color: theme.success }]}>You have arrived!</Text>
+                </View>
+              )}
+              <TouchableOpacity style={[s.clearBtn, { backgroundColor: theme.hoverBackground }]} onPress={clearAll}>
+                <Text style={[s.clearBtnText, { color: theme.text }]}>Clear</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </Animated.View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#F1F5F9' },
+
+  // Floating search bar
+  searchBar: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 56 : 38,
+    left: 16, right: 16,
+    zIndex: 30,
   },
-  gradient: {
-    flex: 1,
+  searchBarInner: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#fff', borderRadius: 14,
+    paddingHorizontal: 14, paddingVertical: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.13, shadowRadius: 8, elevation: 7,
+    gap: 8,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing.xxl + 20,
-    paddingBottom: spacing.md,
-    paddingHorizontal: spacing.lg,
+  searchBarText: { flex: 1, fontSize: 15, color: '#374151' },
+
+  // Input panel
+  inputPanel: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    zIndex: 40,
+    backgroundColor: '#fff',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    paddingTop: Platform.OS === 'ios' ? 54 : 36,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12, shadowRadius: 10, elevation: 10,
   },
-  headerTitle: {
-    ...typography.h3,
+  panelHeader: {
+    flexDirection: 'row', alignItems: 'center', marginBottom: 14,
   },
-  content: {
-    flex: 1,
-    padding: spacing.lg,
+  panelBack: { padding: 4, marginRight: 10 },
+  panelTitle: { fontSize: 17, fontWeight: '700', color: '#111827' },
+
+  inputRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#F9FAFB', borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 10,
+    marginBottom: 4,
   },
-  mapContainer: {
-    height: 400,
-    borderRadius: borderRadius.xl,
+  inputDot: { width: 10, height: 10, borderRadius: 5, marginRight: 10 },
+  inputField: { flex: 1, fontSize: 14, color: '#111827' },
+  inputDivider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 4 },
+
+  dropdown: {
+    backgroundColor: '#fff', borderRadius: 12, marginBottom: 6,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08, shadowRadius: 6, elevation: 4,
     overflow: 'hidden',
-    marginBottom: spacing.xl,
   },
-  mapCanvas: {
-    flex: 1,
-    position: 'relative',
+  dropItem: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 14, paddingVertical: 11,
+    borderBottomWidth: 1, borderBottomColor: '#F3F4F6',
   },
-  path: {
-    position: 'absolute',
+  dropText: { fontSize: 13, color: '#111827', fontWeight: '500' },
+
+  dirBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#2563EB', borderRadius: 12,
+    paddingVertical: 13, marginTop: 8,
   },
-  pathHorizontal: {
-    width: '80%',
-    height: 4,
-    top: '50%',
-    left: '10%',
+  dirBtnDisabled: { backgroundColor: '#93C5FD' },
+  dirBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+
+  // Map
+  map: { flex: 1, overflow: 'hidden', backgroundColor: '#E8F0E9' },
+
+  // Zoom
+  zoomBox: {
+    position: 'absolute', right: 14, bottom: 180,
+    backgroundColor: '#fff', borderRadius: 12, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12, shadowRadius: 6, elevation: 5,
   },
-  pathVertical: {
-    width: 4,
-    height: '80%',
-    left: '50%',
-    top: '10%',
+  zoomBtn: { padding: 11, alignItems: 'center', justifyContent: 'center' },
+  zoomLine: { height: 1, backgroundColor: '#E5E7EB' },
+  recenterBtn: {
+    position: 'absolute', right: 14, bottom: 130,
+    backgroundColor: '#fff', borderRadius: 12, padding: 11,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12, shadowRadius: 6, elevation: 5,
   },
-  marker: {
-    position: 'absolute',
-    alignItems: 'center',
+
+  // Bottom sheet
+  sheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    paddingTop: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1, shadowRadius: 12, elevation: 18,
+    maxHeight: SH * 0.52,
   },
-  markerButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+  sheetHandle: {
+    width: 40, height: 4, backgroundColor: '#E5E7EB',
+    borderRadius: 2, alignSelf: 'center', marginBottom: 14,
   },
-  markerText: {
-    ...typography.captionMedium,
-    color: '#FFFFFF',
-    fontWeight: '700',
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  sheetIcon: {
+    width: 42, height: 42, borderRadius: 21,
+    backgroundColor: '#2563EB', alignItems: 'center', justifyContent: 'center',
   },
-  markerPin: {
-    width: 4,
-    height: 12,
-    marginTop: -2,
+  sheetTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  sheetMeta:  { fontSize: 12, color: '#6B7280', marginTop: 2 },
+
+  // Progress bar
+  progressTrack: {
+    height: 5, backgroundColor: '#E5E7EB', borderRadius: 3, marginBottom: 10,
   },
-  currentLocation: {
-    position: 'absolute',
+  progressFill: {
+    height: 5, backgroundColor: '#2563EB', borderRadius: 3,
   },
-  currentDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
+
+  // Turn list
+  turnScroll: { maxHeight: 120, marginBottom: 10 },
+  turnRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 5, paddingHorizontal: 4,
+    borderRadius: 8,
   },
-  currentPulse: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#FFFFFF',
+  turnRowActive: { backgroundColor: '#EFF6FF' },
+  turnText: { fontSize: 12, color: '#374151', flex: 1 },
+  turnTextActive: { color: '#1D4ED8', fontWeight: '600' },
+
+  // Buttons
+  btnRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  startBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#2563EB', borderRadius: 12, paddingVertical: 13,
   },
-  buildingsList: {
-    marginBottom: spacing.xl,
+  stopBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#EF4444', borderRadius: 12, paddingVertical: 13,
   },
-  sectionTitle: {
-    ...typography.h3,
-    marginBottom: spacing.md,
+  startBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  clearBtn: {
+    paddingHorizontal: 18, paddingVertical: 13,
+    backgroundColor: '#F3F4F6', borderRadius: 12, alignItems: 'center', justifyContent: 'center',
   },
-  buildingCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    marginBottom: spacing.sm,
+  clearBtnText: { color: '#374151', fontWeight: '600', fontSize: 14 },
+  arrivedBanner: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#ECFDF5', borderRadius: 12, paddingVertical: 13,
   },
-  buildingIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: borderRadius.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  buildingInfo: {
-    flex: 1,
-  },
-  buildingName: {
-    ...typography.bodyMedium,
-    fontWeight: '600',
-    marginBottom: spacing.xs,
-  },
-  buildingDesc: {
-    ...typography.small,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    padding: spacing.xl,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  modalIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: borderRadius.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeButton: {
-    padding: spacing.sm,
-  },
-  modalTitle: {
-    ...typography.h2,
-    marginBottom: spacing.xs,
-  },
-  modalCode: {
-    ...typography.body,
-    marginBottom: spacing.sm,
-  },
-  modalDesc: {
-    ...typography.body,
-    marginBottom: spacing.xl,
-  },
-  modalActions: {
-    gap: spacing.md,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    gap: spacing.sm,
-  },
-  actionButtonText: {
-    ...typography.bodyMedium,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
+  arrivedText: { color: '#059669', fontWeight: '700', fontSize: 14 },
 });

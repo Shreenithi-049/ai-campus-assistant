@@ -61,10 +61,17 @@ const EventCard = React.memo(({ event, theme, index, isRegistered, onRegister })
         <View style={styles.eventActions}>
           {!isRegistered ? (
             <TouchableOpacity 
-              style={[styles.registerButton, { backgroundColor: theme.primary }, shadows.sm]}
-              onPress={() => onRegister(event)}
+              style={[
+                styles.registerButton,
+                { backgroundColor: event.registrationLink ? theme.primary : theme.textSecondary },
+                shadows.sm
+              ]}
+              onPress={() => event.registrationLink && onRegister(event)}
+              disabled={!event.registrationLink}
             >
-              <Text style={styles.registerButtonText}>Register</Text>
+              <Text style={styles.registerButtonText}>
+                {event.registrationLink ? 'Register' : 'Coming Soon'}
+              </Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity 
@@ -75,11 +82,7 @@ const EventCard = React.memo(({ event, theme, index, isRegistered, onRegister })
               <Text style={styles.registerButtonText}>Registered ✔</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity 
-            style={[styles.shareButton, { backgroundColor: theme.glassBackground }]}
-          >
-            <Ionicons name="share-social-outline" size={20} color={theme.text} />
-          </TouchableOpacity>
+
         </View>
       </View>
     </View>
@@ -217,6 +220,7 @@ export default function ModernEventsScreen({ navigation }) {
         {/* Events List */}
         <ScrollView 
           style={styles.content}
+          contentContainerStyle={{ maxWidth: 1200, width: '100%', alignSelf: 'center', paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
         >
           {loading ? (
@@ -380,13 +384,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.xs,
   },
-  shareButton: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
