@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { getTheme, spacing, typography, borderRadius, shadows } from '../constants/modernTheme';
 import { sidebarState } from '../utils/layoutState';
+import { subscribeToAnnouncements } from '../services/announcementsService';
 
 const { width: SW } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
@@ -135,28 +136,8 @@ export function WebSidebar({ state, navigation }) {
         })}
       </nav>
 
-      {/* Bottom: dark mode + user + logout */}
+      {/* Bottom: user + logout */}
       <div style={{ padding: spacing.md, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-        {/* Dark mode toggle */}
-        <button
-          onClick={toggleDarkMode}
-          style={{
-            width: '100%', padding: `${spacing.sm}px`,
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 12, color: '#94A3B8', cursor: 'pointer',
-            display: 'flex', alignItems: 'center',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            gap: spacing.sm, fontSize: 13, fontWeight: '500',
-            marginBottom: spacing.sm, transition: 'background 0.15s',
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-        >
-          <span style={{ fontSize: 16 }}>{isDarkMode ? '☀️' : '🌙'}</span>
-          {!collapsed && (isDarkMode ? 'Light Mode' : 'Dark Mode')}
-        </button>
-
         {/* User info */}
         {!collapsed && userProfile && (
           <div style={{
@@ -207,41 +188,112 @@ export function WebSidebar({ state, navigation }) {
 }
 
 // ─── Web Top Header ───────────────────────────────────────────────────────────
-export function WebTopHeader({ title, subtitle }) {
+export function WebTopHeader({ title, subtitle, navigation }) {
   const { isDarkMode, toggleDarkMode, userProfile } = useAuth();
   const theme = getTheme(isDarkMode);
+  const [showNotif, setShowNotif] = React.useState(false);
+  const [announcements, setAnnouncements] = React.useState([]);
+
+  React.useEffect(() => {
+    const unsub = subscribeToAnnouncements((data) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const active = data.filter(a => {
+        if (!a.date) return true; // no date = always show
+        // Try parsing date string (e.g. "2024-03-15", "March 15, 2024", "2024-03-15T...")
+        const d = new Date(a.date);
+        if (isNaN(d.getTime())) return true; // unparseable = always show
+        d.setHours(0, 0, 0, 0);
+        return d >= today; // only show today or future
+      });
+      setAnnouncements(active);
+    }, () => {});
+    return unsub;
+  }, []);
+
+  const priorityColor = (p) => p === 'high' ? '#EF4444' : p === 'medium' ? '#F59E0B' : '#3B82F6';
+  const priorityIcon  = (p) => p === 'high' ? '🔴' : p === 'medium' ? '🟡' : '🔵';
 
   return (
     <div style={{
-      backgroundColor: theme.surface,
-      borderBottom: `1px solid ${theme.border}`,
+      backgroundColor: theme.surface, borderBottom: `1px solid ${theme.border}`,
       padding: `${spacing.md}px ${spacing.xl}px`,
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-      position: 'sticky', top: 0, zIndex: 50,
+      boxShadow: '0 1px 3px rgba(0,0,0,0.06)', position: 'sticky', top: 0, zIndex: 50,
     }}>
       <div>
         <h1 style={{ fontSize: 22, fontWeight: '700', color: theme.text, margin: 0, lineHeight: 1.3 }}>{title}</h1>
         {subtitle && <p style={{ fontSize: 13, color: theme.textSecondary, margin: 0 }}>{subtitle}</p>}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
-        <button
-          onClick={toggleDarkMode}
-          style={{
-            background: theme.backgroundSecondary,
-            border: `1px solid ${theme.border}`,
-            borderRadius: 9999, padding: '6px 14px',
-            cursor: 'pointer', color: theme.textSecondary,
-            fontSize: 16, display: 'flex', alignItems: 'center', gap: 6,
-            transition: 'all 0.15s',
-          }}
-        >
+
+        {/* Notification bell + dropdown */}
+        <div style={{ position: 'relative' }}>
+          <div onClick={() => setShowNotif(v => !v)}
+            style={{ position: 'relative', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+            <span style={{ fontSize: 20 }}>🔔</span>
+            {announcements.length > 0 && (
+              <span style={{
+                position: 'absolute', top: -4, right: -4, width: 16, height: 16,
+                borderRadius: '50%', background: '#EF4444', border: '2px solid white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 9, fontWeight: '700', color: '#fff',
+              }}>{announcements.length > 9 ? '9+' : announcements.length}</span>
+            )}
+          </div>
+          {showNotif && (
+            <div style={{
+              position: 'absolute', top: 36, right: 0, width: 340, maxHeight: 420,
+              backgroundColor: theme.surface, border: `1px solid ${theme.border}`,
+              borderRadius: 16, boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+              zIndex: 200, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+            }}>
+              <div style={{
+                padding: '14px 16px', borderBottom: `1px solid ${theme.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <span style={{ fontWeight: '700', fontSize: 15, color: theme.text }}>🔔 Notifications</span>
+                <span onClick={() => setShowNotif(false)}
+                  style={{ cursor: 'pointer', fontSize: 20, color: theme.textSecondary }}>×</span>
+              </div>
+              <div style={{ overflowY: 'auto', flex: 1 }}>
+                {announcements.length === 0 ? (
+                  <div style={{ padding: 24, textAlign: 'center', color: theme.textSecondary, fontSize: 13 }}>
+                    No notifications right now
+                  </div>
+                ) : announcements.map((a, i) => (
+                  <div key={a.id || i} style={{
+                    padding: '12px 16px', borderBottom: `1px solid ${theme.border}`,
+                    borderLeft: `4px solid ${priorityColor(a.priority)}`,
+                    backgroundColor: i % 2 === 0 ? 'transparent' : theme.backgroundSecondary,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <span style={{ fontSize: 13 }}>{priorityIcon(a.priority)}</span>
+                      <span style={{ fontWeight: '600', fontSize: 13, color: theme.text }}>{a.title}</span>
+                    </div>
+                    <p style={{ margin: 0, fontSize: 12, color: theme.textSecondary, lineHeight: 1.5 }}>{a.message}</p>
+                    {a.date && <span style={{ fontSize: 11, color: theme.textTertiary, marginTop: 4, display: 'block' }}>{a.date}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Dark mode toggle */}
+        <button onClick={toggleDarkMode} style={{
+          background: theme.backgroundSecondary, border: `1px solid ${theme.border}`,
+          borderRadius: 9999, padding: '6px 14px', cursor: 'pointer',
+          color: theme.textSecondary, fontSize: 16,
+          display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s',
+        }}>
           {isDarkMode ? '☀️' : '🌙'}
         </button>
+
+        {/* User pill */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: spacing.sm,
-          background: theme.backgroundSecondary,
-          border: `1px solid ${theme.border}`,
+          background: theme.backgroundSecondary, border: `1px solid ${theme.border}`,
           borderRadius: 9999, padding: '6px 14px 6px 8px',
         }}>
           <div style={{
@@ -249,16 +301,13 @@ export function WebTopHeader({ title, subtitle }) {
             background: 'linear-gradient(135deg, #1E3A8A, #8B5CF6)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: '#fff', fontWeight: '700', fontSize: 12,
-          }}>
-            {(userProfile?.fullName || 'S')[0].toUpperCase()}
-          </div>
+          }}>{(userProfile?.fullName || 'S')[0].toUpperCase()}</div>
           <span style={{ fontSize: 13, fontWeight: '500', color: theme.text }}>
             {userProfile?.fullName?.split(' ')[0] || 'Student'}
           </span>
           <span style={{
             background: '#3B82F620', color: '#3B82F6',
-            borderRadius: 9999, padding: '2px 8px',
-            fontSize: 11, fontWeight: '600',
+            borderRadius: 9999, padding: '2px 8px', fontSize: 11, fontWeight: '600',
           }}>Student</span>
         </div>
       </div>

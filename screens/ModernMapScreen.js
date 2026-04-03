@@ -19,15 +19,15 @@ import { getTheme, spacing, typography, borderRadius, shadows } from '../constan
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const { width: SW, height: SH } = Dimensions.get('window');
-const VB_W = 700;
-const VB_H = 620;
+const VB_W = 800;
+const VB_H = 640;
 const SVG_TO_M = 0.5;
 const STEPS_PER_M = 1.3;
 const NAV_DURATION = 8000; // ms for full route animation
 
 // ─── Road visual paths ────────────────────────────────────────────────────────
 const ROADS = [
-  'M 30 220 L 670 220',
+  'M 30 220 L 770 220',
   'M 300 100 L 300 590',
   'M 100 220 L 100 590',
   'M 135 100 L 220 220',
@@ -86,27 +86,49 @@ function interpolateDot(segments, progress) {
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
-export default function ModernMapScreen() {
+export default function ModernMapScreen({ route: navRoute }) {
   const { isDarkMode } = useAuth();
   const theme = getTheme(isDarkMode);
 
   // Search state
   const [startQuery, setStartQuery]       = useState('My Location');
   const [destQuery, setDestQuery]         = useState('');
-  const [startBuilding, setStartBuilding] = useState(null); // null = user location
+  const [startBuilding, setStartBuilding] = useState(null);
   const [destBuilding, setDestBuilding]   = useState(null);
   const [startSuggestions, setStartSuggestions] = useState([]);
   const [destSuggestions, setDestSuggestions]   = useState([]);
-  const [activeInput, setActiveInput]     = useState(null); // 'start' | 'dest'
+  const [activeInput, setActiveInput]     = useState(null);
   const [panelOpen, setPanelOpen]         = useState(false);
 
-  // Route state
-  const [route, setRoute]       = useState(null); // { path, svgD, dist, segments }
+  // Route state — declared BEFORE any useEffect that references them
+  const [route, setRoute]       = useState(null);
   const [navMode, setNavMode]   = useState(false);
   const [navDone, setNavDone]   = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [dotPos, setDotPos]     = useState(null);
   const [turns, setTurns]       = useState([]);
+
+  // Auto-navigate when destination param passed from Home screen
+  useEffect(() => {
+    const destParam = navRoute?.params?.destination;
+    if (!destParam) return;
+    const found = buildings.find(b => b.name.toLowerCase() === destParam.toLowerCase());
+    if (!found) return;
+    setDestBuilding(found);
+    setDestQuery(found.name);
+    const path = dijkstra(USER_NODE, found.node);
+    if (!path.length) return;
+    const svgD     = pathToSvgD(path);
+    const dist     = pathDistance(path);
+    const segments = buildRouteSegments(path);
+    const turnList = getTurnInstructions(path);
+    setRoute({ path, svgD, dist, segments });
+    setTurns(turnList);
+    setNavMode(false);
+    setNavDone(false);
+    setCurrentStep(0);
+    setDotPos(segments.length ? { x: segments[0].x1, y: segments[0].y1 } : null);
+  }, [navRoute?.params?.destination]);
 
   // Animation refs
   const navProgress   = useRef(new Animated.Value(0)).current;
@@ -172,7 +194,7 @@ export default function ModernMapScreen() {
   // ── Sheet animation ────────────────────────────────────────────────────────
   useEffect(() => {
     Animated.spring(sheetAnim, {
-      toValue: route ? 0 : 300,
+      toValue: route ? 0 : -300,
       useNativeDriver: true,
       tension: 65, friction: 11,
     }).start();
@@ -459,86 +481,119 @@ export default function ModernMapScreen() {
             viewBox={`0 0 ${VB_W} ${VB_H}`}
             preserveAspectRatio="xMidYMid meet"
           >
-            {/* Background */}
-            <Rect x="0" y="0" width={VB_W} height={VB_H} fill={isDarkMode ? '#020617' : '#E8F0E9'} />
+            {/* Campus ground */}
+            <Rect x="0" y="0" width={VB_W} height={VB_H} fill={isDarkMode ? '#0F172A' : '#EEF5EE'} />
 
-            {/* Roads — outer */}
+            {/* Green grass patches */}
+            <Rect x="495" y="240" width="290" height="340" rx="8" fill={isDarkMode ? '#14532D' : '#BBF7D0'} opacity="0.5" />
+            <Rect x="385" y="10" width="300" height="105" rx="8" fill={isDarkMode ? '#14532D' : '#BBF7D0'} opacity="0.4" />
+
+            {/* Campus boundary */}
+            <Rect x="5" y="5" width={VB_W - 10} height={VB_H - 10} rx="12"
+              fill="none" stroke={isDarkMode ? '#1E3A5F' : '#93C5FD'} strokeWidth="3" strokeDasharray="8 6" />
+
+            {/* Roads — outer kerb */}
             {ROADS.map((d, i) => (
-              <Path key={`ro${i}`} d={d} stroke={isDarkMode ? '#1E293B' : '#C8D5C8'} strokeWidth="24"
-                strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              <Path key={`ro${i}`} d={d}
+                stroke={isDarkMode ? '#1E3A5F' : '#94A3B8'}
+                strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" fill="none" />
             ))}
-            {/* Roads — surface */}
+            {/* Roads — asphalt surface */}
             {ROADS.map((d, i) => (
-              <Path key={`rs${i}`} d={d} stroke={isDarkMode ? '#0F172A' : '#FFFFFF'} strokeWidth="14"
-                strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              <Path key={`rs${i}`} d={d}
+                stroke={isDarkMode ? '#1E293B' : '#F1F5F9'}
+                strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" fill="none" />
             ))}
-            {/* Roads — centre dash */}
+            {/* Roads — centre line */}
             {ROADS.map((d, i) => (
-              <Path key={`rd${i}`} d={d} stroke={theme.border} strokeWidth="2"
-                strokeLinecap="round" strokeDasharray="12 10" fill="none" />
+              <Path key={`rd${i}`} d={d}
+                stroke={isDarkMode ? '#334155' : '#CBD5E1'}
+                strokeWidth="1.5" strokeLinecap="round" strokeDasharray="10 8" fill="none" />
             ))}
 
             {/* Route glow */}
             {route?.svgD && (
-              <Path d={route.svgD} stroke={theme.info} strokeWidth="20"
-                strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.45" />
+              <Path d={route.svgD} stroke="#60A5FA" strokeWidth="18"
+                strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.35" />
             )}
             {/* Route line */}
             {route?.svgD && (
-              <Path d={route.svgD} stroke={theme.primary} strokeWidth="7"
+              <Path d={route.svgD} stroke="#2563EB" strokeWidth="6"
                 strokeLinecap="round" strokeLinejoin="round" fill="none" />
             )}
+            {/* Route arrows */}
+            {route?.svgD && (
+              <Path d={route.svgD} stroke="#FFFFFF" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 14" fill="none" />
+            )}
 
-            {/* Entrance label */}
-            <Rect x="80" y="72" width="110" height="40" rx="10" fill={theme.textTertiary} />
-            <SvgText x="135" y="97" fontSize="10" fontWeight="bold" fill={theme.surface} textAnchor="middle">ENTRANCE</SvgText>
+            {/* Entrance gate */}
+            <Rect x="78" y="70" width="114" height="38" rx="8"
+              fill={isDarkMode ? '#1E3A8A' : '#1E3A8A'} />
+            <Rect x="78" y="70" width="114" height="38" rx="8"
+              fill="none" stroke="#60A5FA" strokeWidth="1.5" />
+            <SvgText x="135" y="84" fontSize="7" fill="#93C5FD" textAnchor="middle">🏫</SvgText>
+            <SvgText x="135" y="100" fontSize="9" fontWeight="bold" fill="#FFFFFF" textAnchor="middle">ENTRANCE</SvgText>
 
             {/* Buildings */}
             {buildings.map((b, i) => {
               const isDest  = destBuilding?.name === b.name;
               const isStart = startBuilding?.name === b.name;
+              const fillColor = isDest ? '#2563EB' : isStart ? '#059669' : isDarkMode ? '#1E293B' : b.color;
+              const strokeColor = isDest ? '#93C5FD' : isStart ? '#6EE7B7' : isDarkMode ? '#334155' : 'rgba(255,255,255,0.3)';
               return (
                 <G key={i} onPress={() => tapBuilding(b)}>
-                  <Rect x={b.x+3} y={b.y+3} width={b.w} height={b.h} rx="13" fill="rgba(0,0,0,0.15)" />
-                  <Rect
-                    x={b.x} y={b.y} width={b.w} height={b.h} rx="13"
-                    fill={isDest ? theme.primary : isStart ? theme.success : isDarkMode ? '#1E293B' : b.color}
-                    stroke={isDest || isStart ? theme.surface : isDarkMode ? theme.border : 'none'}
-                    strokeWidth={isDest || isStart ? 2.5 : isDarkMode ? 1 : 0}
-                  />
+                  {/* Drop shadow */}
+                  <Rect x={b.x + 4} y={b.y + 4} width={b.w} height={b.h} rx="10"
+                    fill="rgba(0,0,0,0.18)" />
+                  {/* Building body */}
+                  <Rect x={b.x} y={b.y} width={b.w} height={b.h} rx="10"
+                    fill={fillColor} stroke={strokeColor} strokeWidth="1.5" />
+                  {/* Highlight top edge */}
+                  <Rect x={b.x + 2} y={b.y + 2} width={b.w - 4} height={6} rx="8"
+                    fill="rgba(255,255,255,0.15)" />
+                  {/* Emoji */}
                   <SvgText
-                    x={b.x + b.w / 2} y={b.y + b.h / 2 + 4}
-                    fontSize={b.w > 110 ? 10 : 8} fontWeight="bold"
-                    fill={isDest || isStart ? theme.surface : theme.text}
-                    textAnchor="middle"
+                    x={b.x + b.w / 2} y={b.y + b.h / 2 - 4}
+                    fontSize={b.h > 80 ? 14 : 10} textAnchor="middle"
+                  >{b.emoji}</SvgText>
+                  {/* Name */}
+                  <SvgText
+                    x={b.x + b.w / 2} y={b.y + b.h / 2 + (b.h > 80 ? 14 : 10)}
+                    fontSize={b.w > 130 ? 10 : b.w > 90 ? 8.5 : 7.5}
+                    fontWeight="bold" fill="#FFFFFF" textAnchor="middle"
                   >{b.name}</SvgText>
                 </G>
               );
             })}
 
-            {/* User / start location pulse ring */}
-            <Circle cx={userPos.x} cy={userPos.y} r="18" fill={theme.primary} opacity="0.15" />
-            <Circle cx={userPos.x} cy={userPos.y} r="12" fill={theme.surface} />
-            <Circle cx={userPos.x} cy={userPos.y} r="8"  fill={theme.primary} />
-            <Circle cx={userPos.x} cy={userPos.y} r="3"  fill={theme.surface} />
+            {/* User location */}
+            <Circle cx={userPos.x} cy={userPos.y} r="20" fill="#3B82F6" opacity="0.15" />
+            <Circle cx={userPos.x} cy={userPos.y} r="13" fill="#FFFFFF" />
+            <Circle cx={userPos.x} cy={userPos.y} r="9"  fill="#2563EB" />
+            <Circle cx={userPos.x} cy={userPos.y} r="4"  fill="#FFFFFF" />
 
             {/* Destination pin */}
             {destPos && (
               <G>
-                <Circle cx={destPos.x} cy={destPos.y} r="13" fill={theme.error} />
-                <Circle cx={destPos.x} cy={destPos.y} r="5"  fill={theme.surface} />
+                <Circle cx={destPos.x} cy={destPos.y} r="15" fill="#EF4444" opacity="0.2" />
+                <Circle cx={destPos.x} cy={destPos.y} r="10" fill="#EF4444" />
+                <Circle cx={destPos.x} cy={destPos.y} r="4"  fill="#FFFFFF" />
               </G>
             )}
 
-            {/* Animated navigation dot */}
+            {/* Nav dot */}
             {navMode && dotPos && (
               <G>
-                <Circle cx={dotPos.x} cy={dotPos.y} r="16" fill={theme.info} opacity="0.25" />
-                <Circle cx={dotPos.x} cy={dotPos.y} r="11" fill={theme.surface} />
-                <Circle cx={dotPos.x} cy={dotPos.y} r="7"  fill={theme.primary} />
-                <Circle cx={dotPos.x} cy={dotPos.y} r="3"  fill={theme.surface} />
+                <Circle cx={dotPos.x} cy={dotPos.y} r="18" fill="#60A5FA" opacity="0.25" />
+                <Circle cx={dotPos.x} cy={dotPos.y} r="12" fill="#FFFFFF" />
+                <Circle cx={dotPos.x} cy={dotPos.y} r="8"  fill="#2563EB" />
+                <Circle cx={dotPos.x} cy={dotPos.y} r="3"  fill="#FFFFFF" />
               </G>
             )}
+
+            {/* Compass rose */}
+            <SvgText x="760" y="30" fontSize="18" textAnchor="middle">🧭</SvgText>
           </Svg>
         </Animated.View>
 
@@ -562,11 +617,11 @@ export default function ModernMapScreen() {
       </View>
 
       {/* ── Bottom Sheet ── */}
+      {!panelOpen && (
       <Animated.View style={[s.sheet, { transform: [{ translateY: sheetAnim }], backgroundColor: theme.surface, maxWidth: panelMaxWidth, alignSelf: panelAlign }]}>
         {route && destBuilding && (
           <>
             <View style={[s.sheetHandle, { backgroundColor: theme.border }]} />
-
             {/* Header row */}
             <View style={s.sheetHeader}>
               <View style={[s.sheetIcon, { backgroundColor: theme.primary }]}>
@@ -634,6 +689,7 @@ export default function ModernMapScreen() {
           </>
         )}
       </Animated.View>
+      )}
     </View>
   );
 }
@@ -729,16 +785,19 @@ const s = StyleSheet.create({
     shadowOpacity: 0.12, shadowRadius: 6, elevation: 5,
   },
 
-  // Bottom sheet
+  // Bottom sheet — positioned below the search bar
   sheet: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 110 : 96,
+    left: 16, right: 16,
     backgroundColor: '#fff',
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: 20, paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+    borderRadius: 20,
+    paddingHorizontal: 20, paddingBottom: 16,
     paddingTop: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1, shadowRadius: 12, elevation: 18,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12, shadowRadius: 12, elevation: 18,
     maxHeight: SH * 0.52,
+    zIndex: 25,
   },
   sheetHandle: {
     width: 40, height: 4, backgroundColor: '#E5E7EB',

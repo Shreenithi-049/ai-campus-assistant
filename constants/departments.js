@@ -8,5 +8,6 @@ export const DEPARTMENT_MAP = {
   IT:   'Information Technology',
 };
 
-// Returns full label for a department code, falls back to the code itself
+export const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
+
 export const getDepartmentLabel = (code) => DEPARTMENT_MAP[code] || code;

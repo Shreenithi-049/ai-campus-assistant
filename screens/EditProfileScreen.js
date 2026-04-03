@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../services/firebaseConfig';
 import { useAuth } from '../contexts/AuthContext';
@@ -92,17 +92,35 @@ export default function EditProfileScreen({ navigation }) {
     <View style={styles.inputContainer}>
       <Text style={[styles.label, { color: theme.text }]}>{label}</Text>
       <View style={[styles.input, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}>
-        <Picker
-          selectedValue={formData[field]}
-          onValueChange={(val) => setFormData({ ...formData, [field]: val })}
-          style={{ color: theme.text, flex: 1 }}
-          enabled={!loading}
-        >
-          <Picker.Item label={`Select ${label}`} value="" />
-          {options.map(({ value, label: optLabel }) => (
-            <Picker.Item key={value} label={optLabel} value={value} />
-          ))}
-        </Picker>
+        {Platform.OS === 'web' ? (
+          <select
+            value={formData[field]}
+            onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
+            disabled={loading}
+            style={{
+              flex: 1, width: '100%', border: 'none', outline: 'none',
+              backgroundColor: 'transparent', color: theme.text,
+              fontSize: 16, padding: 4, cursor: 'pointer',
+            }}
+          >
+            <option value="">Select {label}</option>
+            {options.map(({ value, label: optLabel }) => (
+              <option key={value} value={value}>{optLabel}</option>
+            ))}
+          </select>
+        ) : (
+          <Picker
+            selectedValue={formData[field]}
+            onValueChange={(val) => setFormData({ ...formData, [field]: val })}
+            style={{ color: theme.text, flex: 1 }}
+            enabled={!loading}
+          >
+            <Picker.Item label={`Select ${label}`} value="" />
+            {options.map(({ value, label: optLabel }) => (
+              <Picker.Item key={value} label={optLabel} value={value} />
+            ))}
+          </Picker>
+        )}
       </View>
     </View>
   );

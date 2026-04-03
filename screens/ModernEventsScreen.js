@@ -168,9 +168,7 @@ export default function ModernEventsScreen({ navigation }) {
             <Ionicons name="arrow-back" size={24} color={theme.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.text }]}>Events</Text>
-          <TouchableOpacity onPress={toggleDarkMode}>
-            <Ionicons name={isDarkMode ? 'sunny' : 'moon'} size={24} color={theme.text} />
-          </TouchableOpacity>
+          <View style={{ width: 24 }} />
         </View>
 
         {/* Notification Toggle */}

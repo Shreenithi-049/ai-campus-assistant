@@ -102,12 +102,15 @@ function withWideLayout(ScreenComponent, routeName) {
   };
 }
 
-const WrappedHome     = withWideLayout(ModernHomeScreen,     'Home');
-const WrappedChat     = withWideLayout(ModernChatScreen,     'Chat');
-const WrappedMap      = withWideLayout(ModernMapScreen,      'Map');
-const WrappedAcademic = withWideLayout(ModernAcademicScreen, 'Academic');
-const WrappedEvents   = withWideLayout(ModernEventsScreen,   'Events');
-const WrappedProfile  = withWideLayout(ModernProfileScreen,  'Profile');
+const WrappedHome        = withWideLayout(ModernHomeScreen,     'Home');
+const WrappedChat        = withWideLayout(ModernChatScreen,     'Chat');
+const WrappedMap         = withWideLayout(ModernMapScreen,      'Map');
+const WrappedAcademic    = withWideLayout(ModernAcademicScreen, 'Academic');
+const WrappedEvents      = withWideLayout(ModernEventsScreen,   'Events');
+const WrappedProfile     = withWideLayout(ModernProfileScreen,  'Profile');
+const WrappedEditProfile = withWideLayout(EditProfileScreen,    'Profile');
+const WrappedSecurity    = withWideLayout(SecurityScreen,       'Profile');
+const WrappedHelp        = withWideLayout(HelpScreen,           'Profile');
 
 // ─── Main tabs ────────────────────────────────────────────────────────────────
 function MainTabs() {
@@ -158,9 +161,9 @@ function AuthNavigator() {
       ) : (
         <>
           <Stack.Screen name="MainApp"           component={MainTabs} />
-          <Stack.Screen name="EditProfile"       component={EditProfileScreen} />
-          <Stack.Screen name="Security"          component={SecurityScreen} />
-          <Stack.Screen name="Help"              component={HelpScreen} />
+          <Stack.Screen name="EditProfile"       component={WrappedEditProfile} />
+          <Stack.Screen name="Security"          component={WrappedSecurity} />
+          <Stack.Screen name="Help"              component={WrappedHelp} />
           <Stack.Screen name="EventRegistration" component={EventRegistrationScreen} />
         </>
       )}

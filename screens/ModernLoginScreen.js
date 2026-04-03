@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { lightTheme, darkTheme, spacing, typography } from '../constants/modernTheme';
 import { useAuth } from '../contexts/AuthContext';
 import { validateCollegeEmail } from '../utils/validators';
+import { sendPasswordReset } from '../services/authService';
 
 const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
@@ -17,8 +18,26 @@ export default function ModernLoginScreen({ navigation }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resetSent, setResetSent] = useState(false);
   const theme = isDark ? darkTheme : lightTheme;
   const { login } = useAuth();
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError('Enter your email above, then click Forgot Password.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await sendPasswordReset(email.trim());
+      setResetSent(true);
+    } catch (e) {
+      setError(e.message || 'Failed to send reset email.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -169,6 +188,18 @@ export default function ModernLoginScreen({ navigation }) {
                       <Text style={styles.buttonText}>Sign In</Text>
                     )}
                   </TouchableOpacity>
+
+                  {/* Forgot Password */}
+                  {resetSent ? (
+                    <View style={styles.resetSuccess}>
+                      <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                      <Text style={styles.resetSuccessText}>Reset email sent! Check your inbox.</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity onPress={handleForgotPassword} disabled={loading} style={styles.forgotBtn}>
+                      <Text style={[styles.forgotText, { color: theme.primary }]}>Forgot Password?</Text>
+                    </TouchableOpacity>
+                  )}
 
                   <View style={styles.footer}>
                     <Text style={[styles.footerText, { color: theme.textSecondary }]}>
@@ -363,5 +394,28 @@ const styles = StyleSheet.create({
   linkText: {
     ...typography.bodyMedium,
     fontWeight: '600',
+  },
+  forgotBtn: {
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  forgotText: {
+    ...typography.body,
+    fontWeight: '500',
+  },
+  resetSuccess: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+    backgroundColor: '#ECFDF5',
+    padding: spacing.sm,
+    borderRadius: 8,
+  },
+  resetSuccessText: {
+    ...typography.small,
+    color: '#059669',
+    fontWeight: '500',
   },
 });

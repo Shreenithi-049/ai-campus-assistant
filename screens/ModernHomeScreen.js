@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,10 +6,139 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { lightTheme, darkTheme, spacing, typography, borderRadius, shadows } from '../constants/modernTheme';
 import { useAuth } from '../contexts/AuthContext';
 import { VerificationBanner } from '../components/VerificationBanner';
+import { subscribeToTimetable } from '../services/timetableService';
+import { subscribeToEvents } from '../services/eventsService';
+
+// ── Map room/location keywords → campus map building names ───────────────────
+const LOCATION_TO_BUILDING = {
+  // Generic room types from timetable
+  'classroom': 'CB-05',
+  'lab': 'CSE / IT',
+  'seminar hall': 'SK HALL',
+  'seminar': 'SK HALL',
+  // Specific room codes
+  'ENG-301': 'CB-01', 'ENG-205': 'CB-02', 'ENG-401': 'CSE / IT',
+  'ENG-501': 'ADMIN', 'ENG-502': 'ADMIN', 'ENG-503': 'ADMIN',
+  'CB-01': 'CB-01', 'CB-02': 'CB-02', 'CB-03': 'CB-03',
+  'CB-04': 'CB-04', 'CB-05': 'CB-05', 'CB-06': 'CB-06', 'CB-07': 'CB-07',
+  'CSE': 'CSE / IT', 'IT': 'CSE / IT', 'MECH': 'MECH',
+  'MBA': 'MBA', 'MCA': 'MCA',
+  // Event locations
+  'main auditorium': 'CONVENTION', 'auditorium': 'CONVENTION', 'convention': 'CONVENTION',
+  'open ground': 'FOOTBALL', 'sports complex': 'FOOTBALL', 'football': 'FOOTBALL',
+  'library': 'LIBRARY', 'canteen': 'FOOD COURT', 'food court': 'FOOD COURT',
+  'sk hall': 'SK HALL', 'parking': 'PARKING',
+  'admin': 'ADMIN', 'administrative': 'ADMIN',
+};
+
+function resolveBuilding(locationStr) {
+  if (!locationStr) return null;
+  const lower = locationStr.toLowerCase().trim();
+  // Exact match first
+  if (LOCATION_TO_BUILDING[lower]) return LOCATION_TO_BUILDING[lower];
+  // Partial match
+  for (const [key, building] of Object.entries(LOCATION_TO_BUILDING)) {
+    if (lower.includes(key.toLowerCase())) return building;
+  }
+  return null;
+}
+
+// Parse "9:00 AM" or "08:45 AM" → minutes since midnight
+function parseTime(timeStr) {
+  if (!timeStr) return null;
+  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return null;
+  let [, h, m, period] = match;
+  h = parseInt(h); m = parseInt(m);
+  if (period.toUpperCase() === 'PM' && h !== 12) h += 12;
+  if (period.toUpperCase() === 'AM' && h === 12) h = 0;
+  return h * 60 + m;
+}
+
+function getTodayName() {
+  return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
+}
+function getNowMins() {
+  return new Date().getHours() * 60 + new Date().getMinutes();
+}
 
 export default function ModernHomeScreen({ navigation }) {
   const { userProfile, isDarkMode, toggleDarkMode, user } = useAuth();
   const theme = isDarkMode ? darkTheme : lightTheme;
+  const [nextItem, setNextItem] = useState(null); // { label, building, minsUntil, type }
+
+  // ── Load timetable + events, find next upcoming item ──────────────────────────────
+  useEffect(() => {
+    const dept = userProfile?.department || 'CSD';
+    const year = userProfile?.year || 'III';
+    const today = getTodayName();
+    const nowMins = getNowMins();
+
+    // Timetable
+    const unsubTT = subscribeToTimetable(dept, year,
+      (schedule) => {
+        const candidates = [];
+        const todayClasses = schedule.filter(
+          c => c.day?.toLowerCase() === today.toLowerCase()
+        );
+        todayClasses.forEach(c => {
+          // time field: "08:45 AM - 09:45 AM" — take start time
+          const startStr = (c.time || '').split(' - ')[0].trim();
+          const mins = parseTime(startStr);
+          if (mins !== null && mins > nowMins) {
+            // resolve building from room first, then subject
+            const building = resolveBuilding(c.room) || resolveBuilding(c.subject) || 'CB-05';
+            candidates.push({
+              label: `${c.subject} (${c.room})`,
+              building,
+              minsUntil: mins - nowMins,
+              type: 'class',
+              icon: 'book-outline',
+              room: c.room,
+              professor: c.professor,
+            });
+          }
+        });
+        if (candidates.length) {
+          candidates.sort((a, b) => a.minsUntil - b.minsUntil);
+          setNextItem(candidates[0]);
+        }
+      },
+      () => {}
+    );
+
+    // Events
+    const unsubEv = subscribeToEvents(
+      (events) => {
+        const nowM = getNowMins();
+        const evCandidates = [];
+        events.forEach(ev => {
+          const building = resolveBuilding(ev.location);
+          if (!building) return;
+          const mins = parseTime(ev.time);
+          if (mins !== null && mins > nowM) {
+            evCandidates.push({
+              label: `${ev.title} at ${ev.location}`,
+              building,
+              minsUntil: mins - nowM,
+              type: 'event',
+              icon: 'calendar-outline',
+            });
+          }
+        });
+        // Only update if no class found yet
+        setNextItem(prev => {
+          if (prev?.type === 'class') return prev;
+          if (!evCandidates.length) return prev;
+          evCandidates.sort((a, b) => a.minsUntil - b.minsUntil);
+          return evCandidates[0];
+        });
+      },
+      () => {}
+    );
+
+    return () => { unsubTT(); unsubEv(); };
+  }, [userProfile]);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -26,10 +155,10 @@ export default function ModernHomeScreen({ navigation }) {
   };
 
   const popularQueries = [
-    'Where is the library?',
-    'Show my exam schedule',
-    'Faculty office hours',
-    'Campus events today',
+    'What are the upcoming campus events?',
+    'Who are the faculty in my department?',
+    'What are the latest announcements?',
+    'What is my class schedule?',
   ];
 
   return (
@@ -48,19 +177,6 @@ export default function ModernHomeScreen({ navigation }) {
               <Text style={[styles.userName, { color: theme.text }]}>{getUserName()}</Text>
             </View>
             <View style={styles.headerActions}>
-              <TouchableOpacity 
-                style={[styles.iconButton, { backgroundColor: theme.glassBackground }]}
-                onPress={() => navigation.navigate('Notifications')}
-              >
-                <Ionicons name="notifications-outline" size={24} color={theme.text} />
-                <View style={styles.badge} />
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.iconButton, { backgroundColor: theme.glassBackground }]}
-                onPress={toggleDarkMode}
-              >
-                <Ionicons name={isDarkMode ? 'sunny' : 'moon'} size={24} color={theme.text} />
-              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -95,13 +211,33 @@ export default function ModernHomeScreen({ navigation }) {
                 <Ionicons name="sparkles" size={24} color="#FCD34D" />
                 <Text style={[styles.suggestionTitle, { color: theme.textPrimary }]}>AI Suggestion</Text>
               </View>
-              <Text style={[styles.suggestionText, { color: theme.textPrimary }]}>
-                You have a lecture in Building A, Room 301 in 30 minutes. Would you like directions?
-              </Text>
-              <TouchableOpacity style={styles.suggestionButton}>
-                <Text style={styles.suggestionButtonText}>Get Directions</Text>
-                <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-              </TouchableOpacity>
+              {nextItem ? (
+                <>
+                  <View style={styles.suggestionMeta}>
+                    <Ionicons name={nextItem.icon} size={14} color={theme.textPrimary} style={{ opacity: 0.7 }} />
+                    <Text style={[styles.suggestionMins, { color: theme.textPrimary }]}>
+                      {nextItem.minsUntil < 60
+                        ? `In ${nextItem.minsUntil} min`
+                        : `In ${Math.floor(nextItem.minsUntil / 60)}h ${nextItem.minsUntil % 60}m`}
+                    </Text>
+                  </View>
+                  <Text style={[styles.suggestionText, { color: theme.textPrimary }]}>
+                    You have {nextItem.type === 'class' ? 'a class' : 'an event'} — {nextItem.label}
+                    {nextItem.professor ? ` by ${nextItem.professor}` : ''}. Would you like directions?
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.suggestionButton}
+                    onPress={() => navigation.navigate('Map', { destination: nextItem.building })}
+                  >
+                    <Text style={styles.suggestionButtonText}>Get Directions</Text>
+                    <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <Text style={[styles.suggestionText, { color: theme.textPrimary }]}>
+                  No upcoming classes or events right now. Explore the campus map!
+                </Text>
+              )}
             </LinearGradient>
           </Animated.View>
 
@@ -208,6 +344,13 @@ const styles = StyleSheet.create({
     ...typography.body,
     marginBottom: spacing.md,
     lineHeight: 22,
+  },
+  suggestionMeta: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: spacing.xs, marginBottom: spacing.xs,
+  },
+  suggestionMins: {
+    fontSize: 12, fontWeight: '600', opacity: 0.75,
   },
   suggestionButton: {
     flexDirection: 'row',

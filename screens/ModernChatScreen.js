@@ -222,9 +222,7 @@ export default function ModernChatScreen({ navigation, route }) {
               </Text>
             </View>
           </View>
-          <TouchableOpacity onPress={toggleDarkMode}>
-            <Ionicons name={isDarkMode ? 'sunny' : 'moon'} size={24} color={theme.text} />
-          </TouchableOpacity>
+          <View style={{ width: 24 }} />
         </View>
 
         {isLoading ? (

@@ -54,45 +54,59 @@ app.post('/ask', async (req, res) => {
 function buildPrompt(message, context) {
   if (!context) return message;
 
-  return `You are CampusAI, an intelligent assistant for SKCET (Sri Krishna College of Engineering and Technology) students.
+  const eventsBlock = context.events?.length > 0
+    ? `UPCOMING EVENTS (${context.events.length} total):\n${context.events.map(e =>
+        `• ${e.title} | ${e.date} ${e.time ? 'at ' + e.time : ''} | ${e.location || 'TBD'}${e.category ? ' [' + e.category + ']' : ''}${e.description ? ' - ' + e.description : ''}`
+      ).join('\n')}`
+    : 'UPCOMING EVENTS: None currently scheduled.';
 
-Student Information:
-- Name: ${context.student?.name || 'Student'}
-- Department: ${context.student?.department || 'Computer Science'}
-- Year: ${context.student?.year || '3rd Year'}
-- Semester: ${context.student?.semester || '6th Semester'}
+  const timetableBlock = context.timetable?.length > 0
+    ? `CLASS SCHEDULE:\n${context.timetable.map(t =>
+        `• ${t.day ? t.day + ': ' : ''}${t.subject} | ${t.time} | Room: ${t.room} | ${t.professor}`
+      ).join('\n')}`
+    : 'CLASS SCHEDULE: Not available.';
 
-${context.events && context.events.length > 0 ? `
-Upcoming Campus Events:
-${context.events.slice(0, 5).map(e => `- ${e.title} on ${e.date} at ${e.time} (${e.location})`).join('\n')}
-` : ''}
+  const facultyBlock = context.faculty?.length > 0
+    ? `FACULTY DIRECTORY:\n${context.faculty.map(f =>
+        `• ${f.name} (${f.department}) | Email: ${f.email} | Office: ${f.office}${f.phone ? ' | Phone: ' + f.phone : ''}`
+      ).join('\n')}`
+    : 'FACULTY: Not available.';
 
-${context.timetable && context.timetable.length > 0 ? `
-Today's Class Schedule:
-${context.timetable.slice(0, 5).map(t => `- ${t.subject} at ${t.time} in ${t.room} (${t.professor})`).join('\n')}
-` : ''}
+  const announcementsBlock = context.announcements?.length > 0
+    ? `RECENT ANNOUNCEMENTS:\n${context.announcements.map(a =>
+        `• ${a.title}: ${a.message || a.content || ''}`
+      ).join('\n')}`
+    : '';
 
-${context.faculty && context.faculty.length > 0 ? `
-Faculty Directory:
-${context.faculty.slice(0, 5).map(f => `- ${f.name} (${f.department}) - ${f.email}, Office: ${f.office}`).join('\n')}
-` : ''}
+  return `You are IntelliCamp AI, the official smart assistant for SKCET (Sri Krishna College of Engineering and Technology) students.
 
-${context.announcements && context.announcements.length > 0 ? `
-Recent Announcements:
-${context.announcements.slice(0, 3).map(a => `- ${a.title}: ${a.message}`).join('\n')}
-` : ''}
+STUDENT PROFILE:
+- Name: ${context.student?.name}
+- Department: ${context.student?.department}
+- Year: ${context.student?.year}
+- Semester: ${context.student?.semester}
 
-Student Query: ${message}
+${eventsBlock}
 
-Instructions:
-- Provide helpful, accurate, and concise responses
-- Use the context above to answer questions about events, classes, faculty, etc.
-- If asked about specific information not in the context, politely say you don't have that information
-- Be friendly and professional
-- Keep responses under 200 words unless more detail is needed
-- Format responses clearly with line breaks where appropriate
+${timetableBlock}
 
-Response:`;
+${facultyBlock}
+
+${announcementsBlock}
+
+STUDENT QUESTION: ${message}
+
+RULES:
+1. Answer ONLY using the data provided above. Do NOT make up events, faculty, schedules, or locations.
+2. If the answer is in the data, give it directly and clearly.
+3. If the data doesn't contain the answer, say: "I don't have that information right now. Please check with your department or the admin portal."
+4. Never suggest generic web searches or external resources.
+5. Be conversational, friendly, and concise (under 150 words unless listing multiple items).
+6. For event questions, always mention the date, time, and location.
+7. For faculty questions, always include email and office.
+8. Use bullet points for lists.
+
+ANSWER:`;
 }
 
 app.listen(PORT, () => {
